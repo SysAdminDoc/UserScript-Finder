@@ -20,8 +20,8 @@
 // @connect      raw.githubusercontent.com
 // @license      WTFPL
 // @run-at       document-idle
-// @downloadURL  https://update.greasyfork.org/scripts/565312/GreasyForkSleazyFork%20Script%20Finder.user.js
-// @updateURL    https://update.greasyfork.org/scripts/565312/GreasyForkSleazyFork%20Script%20Finder.meta.js
+// @downloadURL  https://github.com/SysAdminDoc/UserScript-Finder/raw/refs/heads/main/UserScript%20Finder-1.0.0.user.js
+// @updateURL    https://github.com/SysAdminDoc/UserScript-Finder/raw/refs/heads/main/UserScript%20Finder-1.0.0.user.js
 // ==/UserScript==
 
 (function() {
