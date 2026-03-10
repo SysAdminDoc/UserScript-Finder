@@ -52,10 +52,6 @@ Click your userscript manager icon on any website and pick a source to search:
 │  │  A suite of modules that enhance your browsing...   │ │
 │  │  📥 2.1k/day  📊 1.2M  ⭐ 892  🔥 9.2  🔄 3d ago   │ │
 │  └────────────────────────────────────────────────────┘ │
-│                                                         │
-│  ┌─ Old Reddit Redirect ──────────────── [Install] ──┐ │
-│  │  ...                                               │ │
-│  └────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -112,27 +108,40 @@ Dark OLED-only interface using the **Catppuccin Mocha** palette with glassmorphi
 
 | Score | Color | Meaning |
 |-------|-------|---------|
-| 8.0+ | 🟢 Green | Highly rated |
-| 6.0–7.9 | 🟡 Yellow | Average |
-| Below 6.0 | 🔴 Red | Low rated |
+| 8.0+ | Green | Highly rated |
+| 6.0–7.9 | Yellow | Average |
+| Below 6.0 | Red | Low rated |
 
 ## Compatibility
 
 | Userscript Manager | Status |
 |--------------------|--------|
-| Tampermonkey | ✅ Fully supported |
-| Violentmonkey | ✅ Fully supported |
-| Greasemonkey | ✅ Supported |
+| Tampermonkey | Fully supported |
+| Violentmonkey | Fully supported |
+| Greasemonkey | Supported |
 
 Works on all websites (`*://*/*`). Runs at `document-idle` with zero overhead until activated — the UI is built lazily on first menu click.
+
+## Related Tools
+
+> **UserScript Finder** is context-aware — it detects which site you're on and finds scripts made specifically for that domain. No separate window needed.
+>
+> If you want a standalone search engine to browse scripts by keyword across all repositories (with ratings, installs, and cross-source deduplication), use the companion web app instead:
+
+**[ScriptHunt](https://github.com/SysAdminDoc/UserScriptHunt)** — A single-file HTML web app (also hosted on GitHub Pages) that searches Greasy Fork, Sleazy Fork, GitHub, and OpenUserJS in parallel with a full results grid. No Tampermonkey required. Also useful for browsing when you're not in a browser with Tampermonkey installed.
+
+| Tool | Use When |
+|------|----------|
+| **UserScript Finder** (this repo) | You're on a website and want scripts for that specific site, without leaving the page |
+| **ScriptHunt** | You want to search any keyword, compare installs/ratings, or browse without Tampermonkey |
 
 ## FAQ
 
 **Q: Why don't I see an icon or button on the page?**
-A: By design. UserScript Finder is menu-only — click your userscript manager icon in the browser toolbar to access it. This keeps pages clean.
+A: By design. UserScript Finder is menu-only — click your userscript manager icon in the browser toolbar to access it.
 
 **Q: GitHub results seem unrelated?**
-A: GitHub search is broader — it finds any repository mentioning the domain alongside userscript-related keywords. Results are sorted by stars to surface the most relevant ones first.
+A: GitHub search finds any repository mentioning the domain alongside userscript-related keywords. Results are sorted by stars to surface the most relevant ones first.
 
 **Q: I'm getting "GitHub rate limit" errors.**
 A: The unauthenticated GitHub API allows ~10 searches per minute. Wait a moment and try again. Results are cached so repeat searches for the same domain won't hit the API.
