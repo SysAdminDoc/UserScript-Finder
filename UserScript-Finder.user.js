@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.10.0
+// @version      1.11.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -473,14 +473,56 @@
 
   // ── Host Service ────────────────────────────────────────────────────
   class HostService {
-    static getCurrentHost() { return window.location.hostname.replace(/^(www\.|m\.|mobile\.)/, ""); }
-    static extractRootDomain(host) {
-      const parts = host.split('.');
-      if (parts.length <= 2) return host;
-      const ccTLDs = ['com','net','org','edu','gov','mil','co','ac'];
-      if (ccTLDs.includes(parts[parts.length - 2])) return parts.slice(-3).join('.');
-      return parts.slice(-2).join('.');
+    static publicSuffixes = new Set([
+      "ac.uk", "co.uk", "gov.uk", "ltd.uk", "me.uk", "net.uk", "nhs.uk", "org.uk", "plc.uk", "sch.uk",
+      "com.au", "net.au", "org.au", "edu.au", "gov.au", "asn.au", "id.au",
+      "co.jp", "ne.jp", "or.jp", "ac.jp", "go.jp",
+      "com.br", "net.br", "org.br", "gov.br",
+      "com.cn", "net.cn", "org.cn", "gov.cn",
+      "co.nz", "net.nz", "org.nz", "ac.nz", "govt.nz",
+      "co.in", "firm.in", "net.in", "org.in", "gen.in", "ind.in",
+      "com.mx", "org.mx", "gob.mx", "edu.mx", "net.mx",
+      "com.tr", "net.tr", "org.tr", "gov.tr",
+      "github.io", "gitlab.io", "pages.dev", "netlify.app", "vercel.app", "herokuapp.com",
+      "blogspot.com", "wordpress.com", "firebaseapp.com", "web.app", "azurewebsites.net", "cloudfront.net"
+    ]);
+
+    static getCurrentHost() { return this.normalizeHost(window.location.hostname); }
+
+    static normalizeHost(host) {
+      let value = String(host || "").trim().toLowerCase().replace(/\.$/, "");
+      if (!value) return "";
+      if (value.startsWith("[") && value.endsWith("]")) return value.slice(1, -1);
+      if (this.isIpAddress(value) || value === "localhost") return value;
+      return value.replace(/^(www\.|m\.|mobile\.)/, "");
     }
+
+    static extractRootDomain(host) {
+      const normalized = this.normalizeHost(host);
+      if (!normalized || normalized === "localhost" || this.isIpAddress(normalized)) return normalized;
+
+      const parts = normalized.split(".").filter(Boolean);
+      if (parts.length <= 2) return normalized;
+
+      const suffixLength = this.publicSuffixLength(parts);
+      const rootLength = Math.min(parts.length, suffixLength + 1);
+      return parts.slice(-rootLength).join(".");
+    }
+
+    static publicSuffixLength(parts) {
+      for (let len = Math.min(parts.length, 3); len >= 2; len--) {
+        if (this.publicSuffixes.has(parts.slice(-len).join("."))) return len;
+      }
+      return 1;
+    }
+
+    static isIpAddress(host) {
+      return /^(?:\d{1,3}\.){3}\d{1,3}$/.test(host) || /^[0-9a-f:]+$/i.test(host);
+    }
+  }
+
+  if (typeof window !== "undefined" && window.__SF_TEST_HOOKS__) {
+    window.__SF_TEST_HOOKS__.HostService = HostService;
   }
 
   // ── Script Service ──────────────────────────────────────────────────
@@ -1897,7 +1939,7 @@
       this.currentService = this.settings.get("lastService") || "greasyfork";
       this.currentSort = this.settings.get("defaultSort");
       this.filters = { updatedMonths: "any", minRating: "any", englishOnly: false };
-      this.currentDomain = HostService.extractRootDomain(HostService.getCurrentHost());
+      this.currentDomain = HostService.getCurrentHost();
       this.isOpen = false;
       this.isLoading = false;
       this.allScripts = [];
@@ -2245,7 +2287,7 @@
 
       try {
         const host = HostService.getCurrentHost();
-        this.currentDomain = HostService.extractRootDomain(host);
+        this.currentDomain = host;
         this.allScripts = await svc.searchScriptsByHost(this.currentDomain, this.settings);
         this.sourceStatus = this.allScripts?._sfStatus || null;
         this._setResultCount(this.allScripts.length);

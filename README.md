@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.10.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.11.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -83,6 +83,7 @@ Click your userscript manager icon on any website and pick a source to search:
 | **Inline Settings** | Gear icon opens settings within the modal — no external menus to navigate |
 | **Persistent Preferences** | Remembers your last-used source, sort order, dense mode, and cache duration |
 | **Domain-Aware** | Automatically detects the current site and strips `www.`/`m.`/`mobile.` prefixes |
+| **Public-Suffix Aware Matching** | Normalizes common multi-label and hosted suffixes such as `co.uk`, `com.au`, `github.io`, `pages.dev`, and `netlify.app` before root-domain fallback |
 | **Shadow DOM** | Fully encapsulated — styles never leak into or out of the host page |
 | **TrustedTypes Safe** | Compatible with strict CSP pages (Google, YouTube, etc.) |
 

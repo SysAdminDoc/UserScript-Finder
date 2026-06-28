@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.11.0] - 2026-06-28
+
+- Added public-suffix-aware host normalization for common multi-label and hosted suffixes, exact-host searching before root fallback, and HostService tests for `co.uk`, `com.au`, `github.io`, mobile prefixes, localhost, and IP hosts.
+
 ## [v1.10.0] - 2026-06-28
 
 - Added install URL safety checks with per-source HTTPS allowlists, `.user.js` URL validation, metadata-block verification before install handoff, unsafe-result View downgrades, inline warnings, and tests.
