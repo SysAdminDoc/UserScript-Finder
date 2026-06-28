@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.1.0
-// @description  Finds GreasyFork/SleazyFork/OpenUserJS/GitHub scripts for the current domain
+// @version      1.2.0
+// @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
 // @grant        GM_xmlhttpRequest
@@ -17,6 +17,7 @@
 // @connect      greasyfork.org
 // @connect      sleazyfork.org
 // @connect      openuserjs.org
+// @connect      chromewebstore.google.com
 // @connect      api.github.com
 // @connect      raw.githubusercontent.com
 // @license      WTFPL
@@ -80,6 +81,9 @@
     openuserjs: '#89b4fa',
     openuserjsDim: '#4f7fd8',
     glowOpenUserJS: 'rgba(137, 180, 250, 0.15)',
+    chromewebstore: '#f9e2af',
+    chromewebstoreDim: '#fbbc04',
+    glowChromeWebStore: 'rgba(249, 226, 175, 0.15)',
     github:     '#f0883e',
     githubDim:  '#d2691e',
     glowGithub: 'rgba(240, 136, 62, 0.15)',
@@ -361,6 +365,165 @@
     }
   }
 
+  // Chrome Web Store has no public search API; parse embedded extension result records.
+  class ChromeWebStoreService {
+    constructor() {
+      this.serviceName = "chromewebstore";
+      this.baseUrl = "https://chromewebstore.google.com";
+      this.cache = new Map();
+    }
+
+    async searchScriptsByHost(host, settings) {
+      let extensions = await this._searchWithDomain(host, settings);
+      if (extensions.length === 0) {
+        const root = HostService.extractRootDomain(host);
+        if (root !== host) extensions = await this._searchWithDomain(root, settings);
+      }
+      return extensions;
+    }
+
+    async _searchWithDomain(domain, settings) {
+      const cacheKey = `chromewebstore_${domain}`;
+      const cacheDuration = settings.get("cacheDuration");
+      const cached = this.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < cacheDuration) return cached.data;
+
+      let extensions = [];
+      try {
+        const html = await this._fetchSearch(domain);
+        extensions = this._parseSearchResults(html);
+      } catch {
+        extensions = [];
+      }
+
+      this.cache.set(cacheKey, { data: extensions, timestamp: Date.now() });
+      return extensions;
+    }
+
+    _fetchSearch(domain) {
+      return this._fetch(this.getDirectSearchUrl(domain));
+    }
+
+    _fetch(url) {
+      return new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+          method: "GET", url,
+          headers: { Accept: "text/html,application/xhtml+xml" },
+          onload: r => {
+            if (r.status === 200) resolve(r.responseText || "");
+            else if (r.status === 404) resolve("");
+            else reject(new Error(`Chrome Web Store ${r.status}`));
+          },
+          onerror: reject
+        });
+      });
+    }
+
+    _parseSearchResults(html) {
+      const records = this._extractExtensionRecords(html);
+      return records.map(record => this._normalize(record)).filter(Boolean).slice(0, 25);
+    }
+
+    _extractExtensionRecords(html) {
+      if (!html) return [];
+      const records = [];
+      const seen = new Set();
+      const re = /\[\[\["([a-p]{32})",/g;
+      let match;
+
+      while ((match = re.exec(html)) && records.length < 30) {
+        const start = match.index + 2;
+        const text = this._extractBalancedArray(html, start);
+        if (!text) continue;
+
+        try {
+          const record = JSON.parse(text);
+          if (record?.[0] && !seen.has(record[0])) {
+            seen.add(record[0]);
+            records.push(record);
+          }
+        } catch { /* Ignore malformed embedded records. */ }
+      }
+
+      return records;
+    }
+
+    _extractBalancedArray(text, start) {
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+
+      for (let i = start; i < text.length; i++) {
+        const ch = text[i];
+        if (inString) {
+          if (escape) escape = false;
+          else if (ch === "\\") escape = true;
+          else if (ch === '"') inString = false;
+          continue;
+        }
+
+        if (ch === '"') inString = true;
+        else if (ch === "[") depth++;
+        else if (ch === "]") {
+          depth--;
+          if (depth === 0) return text.slice(start, i + 1);
+        }
+      }
+
+      return null;
+    }
+
+    _normalize(record) {
+      const id = record[0];
+      const name = this._cleanText(record[2] || record[19]);
+      if (!id || !name) return null;
+
+      const manifest = this._parseManifest(record[18]);
+      const updated = Array.isArray(record[17]) && Number.isFinite(record[17][0])
+        ? new Date((record[17][0] * 1000) + Math.round((record[17][1] || 0) / 1000000)).toISOString()
+        : null;
+
+      return {
+        _source: "chromewebstore",
+        name,
+        description: this._cleanText(record[6] || manifest.description) || "",
+        url: `${this.baseUrl}/detail/${this._slugify(name)}/${id}`,
+        code_url: null,
+        version: manifest.version || null,
+        license: null,
+        users: [{ name: manifest.author || null }],
+        daily_installs: null,
+        total_installs: Number.isFinite(record[14]) ? record[14] : null,
+        good_ratings: Number.isFinite(record[3]) ? record[3] : null,
+        fan_score: null,
+        code_updated_at: updated,
+        created_at: null,
+        _rating: Number.isFinite(record[3]) ? record[3] : null,
+        _rating_count: Number.isFinite(record[4]) ? record[4] : null,
+        _category: Array.isArray(record[11]) ? record[11][0] : null,
+        _image: record[1] || null,
+        _full_name: id,
+        _topics: []
+      };
+    }
+
+    _parseManifest(text) {
+      if (!text) return {};
+      try { return JSON.parse(text); }
+      catch { return {}; }
+    }
+
+    _slugify(text) {
+      return this._cleanText(text).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "extension";
+    }
+
+    _cleanText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
+
+    getDirectSearchUrl(domain) {
+      return `${this.baseUrl}/search/${encodeURIComponent(domain)}?hl=en`;
+    }
+  }
+
   // ── GitHub Script Service ───────────────────────────────────────────
   class GitHubScriptService {
     constructor() {
@@ -575,6 +738,7 @@
 }
 .sf-modal-header.sleazyfork::before { background: linear-gradient(90deg, ${THEME.purple}, ${THEME.mauve}); }
 .sf-modal-header.openuserjs::before { background: linear-gradient(90deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}); }
+.sf-modal-header.chromewebstore::before { background: linear-gradient(90deg, ${THEME.chromewebstoreDim}, ${THEME.chromewebstore}); }
 .sf-modal-header.github::before { background: linear-gradient(90deg, ${THEME.github}, ${THEME.peach}); }
 
 .sf-header-row { display: flex; align-items: center; gap: 12px; }
@@ -620,6 +784,7 @@
 .sf-search-box:focus-within { border-color: ${THEME.green}33; box-shadow: 0 0 0 3px ${THEME.green}11; }
 .sf-search-box.sleazyfork:focus-within { border-color: ${THEME.purple}33; box-shadow: 0 0 0 3px ${THEME.purple}11; }
 .sf-search-box.openuserjs:focus-within { border-color: ${THEME.openuserjs}33; box-shadow: 0 0 0 3px ${THEME.openuserjs}11; }
+.sf-search-box.chromewebstore:focus-within { border-color: ${THEME.chromewebstore}44; box-shadow: 0 0 0 3px ${THEME.chromewebstore}11; }
 .sf-search-box.github:focus-within { border-color: ${THEME.github}33; box-shadow: 0 0 0 3px ${THEME.github}11; }
 .sf-search-box svg { width: 14px; height: 14px; color: ${THEME.overlay}; flex-shrink: 0; }
 .sf-search-input {
@@ -632,7 +797,7 @@
 
 /* Tabs */
 .sf-tabs {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px;
   padding: 10px 20px; background: ${THEME.surface0}44;
   border-bottom: 1px solid ${THEME.glassBorder};
 }
@@ -658,6 +823,11 @@
   color: ${THEME.openuserjs}; border-color: ${THEME.openuserjs}33;
   box-shadow: 0 0 16px ${THEME.glowOpenUserJS};
 }
+.sf-tab.chromewebstore.active {
+  background: linear-gradient(135deg, ${THEME.chromewebstoreDim}44, ${THEME.chromewebstore}22);
+  color: ${THEME.chromewebstore}; border-color: ${THEME.chromewebstore}44;
+  box-shadow: 0 0 16px ${THEME.glowChromeWebStore};
+}
 .sf-tab.github.active {
   background: linear-gradient(135deg, ${THEME.githubDim}44, ${THEME.github}22);
   color: ${THEME.github}; border-color: ${THEME.github}33;
@@ -681,6 +851,7 @@
 .sf-sort-select:focus { border-color: ${THEME.green}44; }
 .sf-sort-select.sleazyfork:focus { border-color: ${THEME.purple}44; }
 .sf-sort-select.openuserjs:focus { border-color: ${THEME.openuserjs}44; }
+.sf-sort-select.chromewebstore:focus { border-color: ${THEME.chromewebstore}44; }
 .sf-sort-select.github:focus { border-color: ${THEME.github}44; }
 
 /* Content */
@@ -707,6 +878,7 @@
 }
 .sf-item.sleazyfork:hover::after { background: linear-gradient(180deg, ${THEME.purple}, ${THEME.mauve}); }
 .sf-item.openuserjs:hover::after { background: linear-gradient(180deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}); }
+.sf-item.chromewebstore:hover::after { background: linear-gradient(180deg, ${THEME.chromewebstoreDim}, ${THEME.chromewebstore}); }
 .sf-item.github:hover::after { background: linear-gradient(180deg, ${THEME.github}, ${THEME.peach}); }
 .sf-item:last-child { border-bottom: none; }
 
@@ -727,6 +899,7 @@
 .sf-script-title:hover { color: ${THEME.green}; }
 .sf-item.sleazyfork .sf-script-title:hover { color: ${THEME.purple}; }
 .sf-item.openuserjs .sf-script-title:hover { color: ${THEME.openuserjs}; }
+.sf-item.chromewebstore .sf-script-title:hover { color: ${THEME.chromewebstore}; }
 .sf-item.github .sf-script-title:hover { color: ${THEME.github}; }
 
 .sf-script-sub {
@@ -750,6 +923,8 @@
 .sf-item.sleazyfork .sf-install-btn:hover { background: ${THEME.purple}44; }
 .sf-item.openuserjs .sf-install-btn { background: ${THEME.openuserjs}22; color: ${THEME.openuserjs}; }
 .sf-item.openuserjs .sf-install-btn:hover { background: ${THEME.openuserjs}44; }
+.sf-item.chromewebstore .sf-install-btn { background: ${THEME.chromewebstore}22; color: ${THEME.chromewebstore}; }
+.sf-item.chromewebstore .sf-install-btn:hover { background: ${THEME.chromewebstore}44; }
 .sf-item.github .sf-install-btn { background: ${THEME.github}22; color: ${THEME.github}; }
 .sf-item.github .sf-install-btn:hover { background: ${THEME.github}44; }
 
@@ -780,6 +955,7 @@
 }
 .sf-spinner.sleazyfork { border-top-color: ${THEME.purple}; }
 .sf-spinner.openuserjs { border-top-color: ${THEME.openuserjs}; }
+.sf-spinner.chromewebstore { border-top-color: ${THEME.chromewebstore}; }
 .sf-spinner.github { border-top-color: ${THEME.github}; }
 .sf-loading-text { font: 500 13px/1 inherit; color: ${THEME.subtext0}; }
 
@@ -797,6 +973,7 @@
 .sf-action-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
 .sf-action-btn.sleazyfork { background: linear-gradient(135deg, ${THEME.purpleDim}, ${THEME.purple}88); }
 .sf-action-btn.openuserjs { background: linear-gradient(135deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}88); }
+.sf-action-btn.chromewebstore { background: linear-gradient(135deg, ${THEME.chromewebstoreDim}, ${THEME.chromewebstore}88); }
 .sf-action-btn.github { background: linear-gradient(135deg, ${THEME.githubDim}, ${THEME.github}88); }
 
 /* Footer */
@@ -811,6 +988,7 @@
 .sf-footer a:hover { text-decoration: underline; }
 .sf-footer a.sleazyfork { color: ${THEME.purple}; }
 .sf-footer a.openuserjs { color: ${THEME.openuserjs}; }
+.sf-footer a.chromewebstore { color: ${THEME.chromewebstore}; }
 .sf-footer a.github { color: ${THEME.github}; }
 
 /* Settings panel */
@@ -864,6 +1042,7 @@
         greasyfork: new ScriptService("https://greasyfork.org", "greasyfork"),
         sleazyfork: new ScriptService("https://sleazyfork.org", "sleazyfork"),
         openuserjs: new OpenUserJSScriptService(),
+        chromewebstore: new ChromeWebStoreService(),
         github: new GitHubScriptService()
       };
       this.currentService = this.settings.get("lastService") || "greasyfork";
@@ -927,6 +1106,7 @@
           <button class="sf-tab active" data-service="greasyfork">GreasyFork</button>
           <button class="sf-tab sleazyfork" data-service="sleazyfork">SleazyFork</button>
           <button class="sf-tab openuserjs" data-service="openuserjs">OpenUserJS</button>
+          <button class="sf-tab chromewebstore" data-service="chromewebstore">Chrome</button>
           <button class="sf-tab github" data-service="github">GitHub</button>
         </div>
         <div class="sf-sort-bar">
@@ -1066,6 +1246,9 @@
       window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (OpenUserJS)`, () => {
         this._ensureUI(); this.currentService = "openuserjs"; this._open();
       }));
+      window._sfMenuIds.push(GM_registerMenuCommand(`Find Extensions for ${domain} (Chrome Web Store)`, () => {
+        this._ensureUI(); this.currentService = "chromewebstore"; this._open();
+      }));
       window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (GitHub)`, () => {
         this._ensureUI(); this.currentService = "github"; this._open();
       }));
@@ -1107,7 +1290,7 @@
 
     _updateServiceColors() {
       const svc = this.currentService;
-      const svcNames = ["greasyfork", "sleazyfork", "openuserjs", "github"];
+      const svcNames = ["greasyfork", "sleazyfork", "openuserjs", "chromewebstore", "github"];
       const header = this.modal.querySelector(".sf-modal-header");
       svcNames.forEach(s => header.classList.toggle(s, s === svc));
       svcNames.forEach(s => this.sortSelect.classList.toggle(s, s === svc));
@@ -1116,8 +1299,8 @@
       const footerLink = this.modal.querySelector(".sf-footer a");
       if (footerLink) {
         svcNames.forEach(s => footerLink.classList.toggle(s, s === svc));
-        const labels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", github: "GitHub" };
-        const urls = { greasyfork: "https://greasyfork.org", sleazyfork: "https://sleazyfork.org", openuserjs: "https://openuserjs.org", github: "https://github.com" };
+        const labels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", github: "GitHub" };
+        const urls = { greasyfork: "https://greasyfork.org", sleazyfork: "https://sleazyfork.org", openuserjs: "https://openuserjs.org", chromewebstore: "https://chromewebstore.google.com", github: "https://github.com" };
         footerLink.textContent = labels[svc];
         footerLink.href = urls[svc];
       }
@@ -1126,8 +1309,8 @@
     _setResultCount(count) {
       const countEl = this.modal.querySelector(".sf-subtitle-count");
       const textEl = this.modal.querySelector(".sf-subtitle-text");
-      const isGH = this.currentService === "github";
-      const unit = isGH ? "repo" : "script";
+      const units = { github: "repo", chromewebstore: "extension" };
+      const unit = units[this.currentService] || "script";
       if (countEl) countEl.textContent = count || 0;
       if (textEl) textEl.textContent = count === 1 ? `${unit} found` : `${unit}s found`;
     }
@@ -1138,7 +1321,7 @@
       this.isLoading = true;
       const svc = this.services[this.currentService];
       const svcClass = this.currentService === "greasyfork" ? "" : this.currentService;
-      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", github: "GitHub" };
+      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", github: "GitHub" };
       const svcLabel = svcLabels[this.currentService];
 
       _safeHTML(this.content, `<div class="sf-loading"><div class="sf-spinner ${svcClass}"></div><div class="sf-loading-text">Searching ${svcLabel}...</div></div>`);
@@ -1169,23 +1352,24 @@
       switch (this.currentSort) {
         case "daily": return copy.sort((a,b) => (b.daily_installs || b.total_installs || b._stars || 0) - (a.daily_installs || a.total_installs || a._stars || 0));
         case "total": return copy.sort((a,b) => (b.total_installs || b._stars || 0) - (a.total_installs || a._stars || 0));
-        case "good": return copy.sort((a,b) => (b.good_ratings || 0) - (a.good_ratings || 0));
+        case "good": return copy.sort((a,b) => (b.good_ratings || b._rating || 0) - (a.good_ratings || a._rating || 0));
         case "fanscore": return copy.sort((a,b) => (b.fan_score || b._forks || 0) - (a.fan_score || a._forks || 0));
         case "updatedate": return copy.sort((a,b) => new Date(b.code_updated_at||0) - new Date(a.code_updated_at||0));
         case "createdate": return copy.sort((a,b) => new Date(b.created_at||0) - new Date(a.created_at||0));
-        default: return copy.sort((a,b) => (b.daily_installs || b._stars || 0) - (a.daily_installs || a._stars || 0));
+        default: return copy.sort((a,b) => (b.daily_installs || b.total_installs || b._stars || 0) - (a.daily_installs || a.total_installs || a._stars || 0));
       }
     }
 
     _displayScripts() {
       let scripts = this.allScripts || [];
       const svcClass = this.currentService === "greasyfork" ? "" : this.currentService;
-      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", github: "GitHub" };
+      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", github: "GitHub" };
       const svcLabel = svcLabels[this.currentService];
       const displayHost = HostService.extractRootDomain(this.currentDomain);
 
       // Update title
-      this.modal.querySelector(".sf-modal-title").textContent = `Scripts for ${displayHost}`;
+      const titleType = this.currentService === "chromewebstore" ? "Extensions" : "Scripts";
+      this.modal.querySelector(".sf-modal-title").textContent = `${titleType} for ${displayHost}`;
 
       // Filter by search
       if (this.searchQuery) {
@@ -1233,6 +1417,7 @@
       item.style.animationDelay = `${Math.min(index * 30, 300)}ms`;
 
       const isGH = script._source === "github";
+      const isCWS = script._source === "chromewebstore";
       const daily = formatNumber(script.daily_installs);
       const total = formatNumber(script.total_installs);
       const good = formatNumber(script.good_ratings);
@@ -1252,7 +1437,7 @@
         return `<span class="sf-badge ${cls}" title="${escapeHtml(title)}">${getIcon(icon)} ${escapeHtml(text)}</span>`;
       };
 
-      // GitHub: show stars + forks; GreasyFork/SleazyFork: show installs + ratings
+      // GitHub: show stars + forks; Chrome Web Store: show users + rating; script registries show install stats.
       let metaHtml;
       if (isGH) {
         const stars = formatNumber(script._stars);
@@ -1265,6 +1450,16 @@
           ${badge("clockwise", updated, "Updated")}
           ${badge("calendarPlus", created, "Created")}
         `;
+      } else if (isCWS) {
+        const totalUsers = formatNumber(script.total_installs);
+        const rating = script._rating != null ? Number(script._rating).toFixed(1) : null;
+        const ratingCount = formatNumber(script._rating_count);
+        metaHtml = `
+          ${badge("chartBar", totalUsers, "Users")}
+          ${badge("star", rating, "Average rating")}
+          ${badge("user", ratingCount, "Rating count")}
+          ${badge("clockwise", updated, "Updated")}
+        `;
       } else {
         metaHtml = `
           ${badge("download", daily ? `${daily}/day` : null, "Daily installs")}
@@ -1276,10 +1471,12 @@
         `;
       }
 
-      // GitHub repos get a "View" button; GreasyFork/SleazyFork get "Install"
+      // Non-userscript sources get a "View" button; script registries get "Install".
       let actionBtn;
-      if (isGH) {
-        actionBtn = `<button class="sf-install-btn" data-url="${escapeHtml(scriptUrl)}" title="View repository">${getIcon('githubLogo')} View</button>`;
+      if (isGH || isCWS) {
+        const icon = isGH ? "githubLogo" : "search";
+        const title = isGH ? "View repository" : "View extension";
+        actionBtn = `<button class="sf-install-btn" data-url="${escapeHtml(scriptUrl)}" title="${title}">${getIcon(icon)} View</button>`;
       } else if (installUrl) {
         actionBtn = `<button class="sf-install-btn" data-url="${escapeHtml(installUrl)}" title="Install script">${getIcon('install')} Install</button>`;
       } else {
