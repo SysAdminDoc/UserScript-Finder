@@ -5,14 +5,14 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.4.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.5.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-WTFPL-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
 </p>
 
 <p align="center">
-  Discover userscripts and extension alternatives for any website — searches GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, GitHub Gists, and GitHub from one place.
+  Discover userscripts and extension alternatives for any website — searches GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, curated catalogs, GitHub Gists, and GitHub from one place.
 </p>
 
 ---
@@ -36,6 +36,7 @@ Click your userscript manager icon on any website and pick a source to search:
 │  ⚙ Find Scripts for reddit.com (OpenUserJS)             │
 │  ⚙ Find Extensions for reddit.com (Chrome Web Store)    │
 │  ⚙ Find Extensions for reddit.com (Mozilla AMO)          │
+│  ⚙ Find Catalogs for reddit.com (Awesome/Tampermonkey)   │
 │  ⚙ Find Scripts for reddit.com (GitHub Gists)            │
 │  ⚙ Find Scripts for reddit.com (GitHub)                 │
 │  ⚙ Reset Script Finder Settings                         │
@@ -47,8 +48,8 @@ Click your userscript manager icon on any website and pick a source to search:
 │  47 scripts found                                       │
 │                                                         │
 │  [GreasyFork] [SleazyFork] [OpenUserJS]                  │
-│  [Chrome]    [Firefox]    [Gists]                        │
-│  [GitHub]                                                │
+│  [Chrome]    [Firefox]    [Catalogs]                     │
+│  [Gists]     [GitHub]                                    │
 │                                                         │
 │  🔍 Filter scripts...                                   │
 │  Sort by: Daily installs ▾                              │
@@ -67,10 +68,11 @@ Click your userscript manager icon on any website and pick a source to search:
 
 | Feature | Description |
 |---------|-------------|
-| **Seven Sources** | Search GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, GitHub Gists, and GitHub from a single interface |
+| **Eight Sources** | Search GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, curated catalogs, GitHub Gists, and GitHub from a single interface |
 | **One-Click Install** | Install scripts directly from registries and `.user.js` Gists without leaving the page |
 | **Live Search Filter** | Real-time filtering within results with match count (e.g., `12/47`) |
 | **Smart Sorting** | Sort by daily installs, total installs, ratings, fan score, last update, or creation date |
+| **Curated Catalogs** | Searches Awesome Userscripts and Tampermonkey's Userscript.Zone handoff for domain-matched recommendations |
 | **GitHub Integration** | Searches repos and Gists matching `{domain} userscript/tampermonkey/greasemonkey`, shows stars and forks |
 | **Dense Mode** | Toggle compact view — hides descriptions and tightens padding for fast scanning |
 | **Relative Timestamps** | Shows `3d ago`, `2mo ago`, `just now` instead of raw ISO dates |
@@ -89,6 +91,7 @@ Click your userscript manager icon on any website and pick a source to search:
 | **OpenUserJS** | `/?q={domain}` HTML search | OpenUserJS scripts matching the current domain | Installs, ratings, last update |
 | **Chrome Web Store** | `/search/{domain}` embedded result data | Chrome extensions matching the current domain | Users, rating, rating count, last update |
 | **Mozilla AMO** | `/api/v5/addons/search/` | Firefox extensions matching the current domain | Users, rating, rating count, last update |
+| **Catalogs** | Awesome Userscripts README + Tampermonkey `scripts.php` | Curated userscripts and Userscript.Zone handoff for the current domain | Catalog source, category |
 | **GitHub Gists** | `gist.github.com/search` HTML search | Gists matching `{domain} userscript` | Files, stars, forks, last active |
 | **GitHub** | `api.github.com/search/repositories` | Repos matching `{domain} userscript` | Stars, forks, language |
 
@@ -115,6 +118,7 @@ Dark OLED-only interface using the **Catppuccin Mocha** palette with glassmorphi
 | OpenUserJS | Blue |
 | Chrome Web Store | Yellow |
 | Mozilla AMO | Orange |
+| Catalogs | Cyan |
 | GitHub Gists | Flamingo |
 | GitHub | Orange / Peach |
 

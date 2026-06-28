@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.4.0
+// @version      1.5.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -19,6 +19,7 @@
 // @connect      openuserjs.org
 // @connect      chromewebstore.google.com
 // @connect      addons.mozilla.org
+// @connect      www.tampermonkey.net
 // @connect      gist.github.com
 // @connect      api.github.com
 // @connect      raw.githubusercontent.com
@@ -73,6 +74,7 @@
     peach:    '#fab387',
     yellow:   '#f9e2af',
     blue:     '#89b4fa',
+    sky:      '#89dceb',
     flamingo: '#f2cdcd',
     rosewater:'#f5e0dc',
     glass:    'rgba(14, 14, 22, 0.82)',
@@ -89,6 +91,9 @@
     mozillaaddons: '#ff8a3d',
     mozillaaddonsDim: '#e66000',
     glowMozillaAddons: 'rgba(255, 138, 61, 0.15)',
+    catalogs: '#89dceb',
+    catalogsDim: '#3db9b7',
+    glowCatalogs: 'rgba(137, 220, 235, 0.15)',
     githubgist: '#f2cdcd',
     githubgistDim: '#e78284',
     glowGitHubGist: 'rgba(242, 205, 205, 0.15)',
@@ -726,6 +731,189 @@
   }
 
   // ── Toast Service ───────────────────────────────────────────────────
+  class CatalogScriptService {
+    constructor() {
+      this.serviceName = "catalogs";
+      this.awesomeUrl = "https://raw.githubusercontent.com/awesome-scripts/awesome-userscripts/master/README.md";
+      this.tampermonkeyUrl = "https://www.tampermonkey.net/scripts.php?locale=en";
+      this.cache = new Map();
+    }
+
+    async searchScriptsByHost(host, settings) {
+      const domain = HostService.extractRootDomain(host);
+      const cacheKey = `catalogs_${domain}`;
+      const cacheDuration = settings.get("cacheDuration");
+      const cached = this.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < cacheDuration) return cached.data;
+
+      const results = [];
+      const seen = new Set();
+      try {
+        const html = await this._fetchText(this.tampermonkeyUrl);
+        for (const item of this._parseTampermonkeyCatalog(html, domain)) {
+          if (!seen.has(item._full_name)) {
+            seen.add(item._full_name);
+            results.push(item);
+          }
+        }
+      } catch { /* Keep Awesome Userscripts available if Tampermonkey blocks. */ }
+
+      try {
+        const markdown = await this._fetchText(this.awesomeUrl);
+        for (const item of this._parseAwesomeUserscripts(markdown, domain)) {
+          if (!seen.has(item._full_name)) {
+            seen.add(item._full_name);
+            results.push(item);
+          }
+        }
+      } catch { /* The handoff result above still gives users a catalog path. */ }
+
+      this.cache.set(cacheKey, { data: results, timestamp: Date.now() });
+      return results;
+    }
+
+    _fetchText(url) {
+      return new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+          method: "GET", url,
+          headers: { Accept: "text/plain,text/html,application/xhtml+xml" },
+          onload: r => {
+            if (r.status === 200) resolve(r.responseText || "");
+            else if (r.status === 404) resolve("");
+            else reject(new Error(`Catalog source ${r.status}`));
+          },
+          onerror: reject
+        });
+      });
+    }
+
+    _parseTampermonkeyCatalog(html, domain) {
+      if (!html || !/userscript\.zone/i.test(html)) return [];
+      const searchUrl = this._userscriptZoneUrl(domain);
+      return [{
+        _source: "catalogs",
+        name: `Userscript.Zone search for ${domain}`,
+        description: "Tampermonkey's catalog handoff for finding matching userscripts by domain, URL, or keyword.",
+        url: searchUrl,
+        code_url: null,
+        version: null,
+        license: null,
+        users: [{ name: "Tampermonkey" }],
+        daily_installs: null,
+        total_installs: null,
+        good_ratings: null,
+        fan_score: null,
+        code_updated_at: null,
+        created_at: null,
+        _catalog_source: "Tampermonkey",
+        _category: "Search portal",
+        _full_name: `tampermonkey/userscript-zone/${domain}`,
+        _topics: ["tampermonkey", "userscript.zone", domain]
+      }];
+    }
+
+    _parseAwesomeUserscripts(markdown, domain) {
+      if (!markdown || typeof DOMParser !== "function") return [];
+      const siteKey = this._siteKey(domain);
+      const detailMatches = Array.from(markdown.matchAll(/<details\b[\s\S]*?<\/details>/gi));
+      const results = [];
+
+      for (const match of detailMatches) {
+        const block = match[0];
+        const category = this._categoryBefore(markdown, match.index || 0);
+        const categoryMatch = this._textMatches(category, domain, siteKey);
+        if (!categoryMatch && !this._strongAwesomeMatch(block, domain, siteKey)) continue;
+
+        const item = this._normalizeAwesomeBlock(block, category, siteKey);
+        if (item) results.push(item);
+      }
+      return results.slice(0, 80);
+    }
+
+    _normalizeAwesomeBlock(block, category, siteKey) {
+      const doc = new DOMParser().parseFromString(`<div>${block}</div>`, "text/html");
+      const summary = doc.querySelector("summary");
+      const mainLink = summary?.querySelector("a[href]");
+      if (!summary || !mainLink) return null;
+
+      const name = this._cleanText(mainLink.textContent) || "Curated userscript";
+      const summaryText = this._cleanText(summary.textContent);
+      const description = this._descriptionFromSummary(summaryText, name);
+      const installLink = Array.from(doc.querySelectorAll("a[href]")).find(link => {
+        const href = link.getAttribute("href") || "";
+        return /\.user\.js(?:[?#].*)?$/i.test(href) || /update\.greasyfork\.org\/scripts\//i.test(href);
+      });
+      const pageUrl = this._absoluteUrl(mainLink.getAttribute("href"));
+      const installUrl = installLink ? this._absoluteUrl(installLink.getAttribute("href")) : null;
+      const fullName = installUrl || pageUrl || `${category}/${name}`;
+
+      return {
+        _source: "catalogs",
+        name,
+        description,
+        url: pageUrl,
+        code_url: installUrl,
+        version: null,
+        license: null,
+        users: [{ name: category ? `Awesome: ${category}` : "Awesome Userscripts" }],
+        daily_installs: null,
+        total_installs: null,
+        good_ratings: null,
+        fan_score: null,
+        code_updated_at: null,
+        created_at: null,
+        _catalog_source: "Awesome Userscripts",
+        _category: category || (siteKey ? siteKey[0].toUpperCase() + siteKey.slice(1) : "Curated"),
+        _full_name: fullName,
+        _topics: ["awesome", category, siteKey].filter(Boolean)
+      };
+    }
+
+    _categoryBefore(markdown, index) {
+      const before = markdown.slice(0, index);
+      const headings = before.match(/^###\s+.*$/gmi);
+      if (!headings?.length) return null;
+      return this._cleanText(headings[headings.length - 1].replace(/^###\s+/, "").replace(/<[^>]*>/g, " "));
+    }
+
+    _strongAwesomeMatch(block, domain, siteKey) {
+      const doc = new DOMParser().parseFromString(`<div>${block}</div>`, "text/html");
+      const summaryTitle = this._cleanText(doc.querySelector("summary a[href]")?.textContent);
+      const hrefs = Array.from(doc.querySelectorAll("a[href]")).map(link => link.getAttribute("href") || "").join(" ");
+      return this._textMatches(`${summaryTitle} ${hrefs}`, domain, siteKey);
+    }
+
+    _textMatches(text, domain, siteKey) {
+      const haystack = String(text || "").toLowerCase();
+      return haystack.includes(String(domain || "").toLowerCase()) || (siteKey && haystack.includes(siteKey));
+    }
+
+    _descriptionFromSummary(summaryText, name) {
+      const withoutName = summaryText.replace(name, "").replace(/^\s*[-–—]\s*/, "");
+      return withoutName || "Curated userscript entry from Awesome Userscripts.";
+    }
+
+    _siteKey(domain) {
+      const label = String(domain || "").split(".").find(part => part && !["www", "com", "net", "org", "io", "co"].includes(part));
+      return label ? label.toLowerCase() : null;
+    }
+
+    _userscriptZoneUrl(domain) {
+      return `https://www.userscript.zone/search?q=${encodeURIComponent(domain)}&utm_source=tm.net&utm_medium=search`;
+    }
+
+    _absoluteUrl(href) {
+      try { return new URL(href, "https://github.com/awesome-scripts/awesome-userscripts/").href; }
+      catch { return href || null; }
+    }
+
+    _cleanText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
+
+    getDirectSearchUrl(domain) {
+      return this._userscriptZoneUrl(domain);
+    }
+  }
+
   class GitHubGistService {
     constructor() {
       this.serviceName = "githubgist";
@@ -1024,6 +1212,7 @@
 .sf-modal-header.openuserjs::before { background: linear-gradient(90deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}); }
 .sf-modal-header.chromewebstore::before { background: linear-gradient(90deg, ${THEME.chromewebstoreDim}, ${THEME.chromewebstore}); }
 .sf-modal-header.mozillaaddons::before { background: linear-gradient(90deg, ${THEME.mozillaaddonsDim}, ${THEME.mozillaaddons}); }
+.sf-modal-header.catalogs::before { background: linear-gradient(90deg, ${THEME.catalogsDim}, ${THEME.catalogs}); }
 .sf-modal-header.githubgist::before { background: linear-gradient(90deg, ${THEME.githubgistDim}, ${THEME.githubgist}); }
 .sf-modal-header.github::before { background: linear-gradient(90deg, ${THEME.github}, ${THEME.peach}); }
 
@@ -1072,6 +1261,7 @@
 .sf-search-box.openuserjs:focus-within { border-color: ${THEME.openuserjs}33; box-shadow: 0 0 0 3px ${THEME.openuserjs}11; }
 .sf-search-box.chromewebstore:focus-within { border-color: ${THEME.chromewebstore}44; box-shadow: 0 0 0 3px ${THEME.chromewebstore}11; }
 .sf-search-box.mozillaaddons:focus-within { border-color: ${THEME.mozillaaddons}44; box-shadow: 0 0 0 3px ${THEME.mozillaaddons}11; }
+.sf-search-box.catalogs:focus-within { border-color: ${THEME.catalogs}44; box-shadow: 0 0 0 3px ${THEME.catalogs}11; }
 .sf-search-box.githubgist:focus-within { border-color: ${THEME.githubgist}44; box-shadow: 0 0 0 3px ${THEME.githubgist}11; }
 .sf-search-box.github:focus-within { border-color: ${THEME.github}33; box-shadow: 0 0 0 3px ${THEME.github}11; }
 .sf-search-box svg { width: 14px; height: 14px; color: ${THEME.overlay}; flex-shrink: 0; }
@@ -1121,6 +1311,11 @@
   color: ${THEME.mozillaaddons}; border-color: ${THEME.mozillaaddons}44;
   box-shadow: 0 0 16px ${THEME.glowMozillaAddons};
 }
+.sf-tab.catalogs.active {
+  background: linear-gradient(135deg, ${THEME.catalogsDim}44, ${THEME.catalogs}22);
+  color: ${THEME.catalogs}; border-color: ${THEME.catalogs}44;
+  box-shadow: 0 0 16px ${THEME.glowCatalogs};
+}
 .sf-tab.githubgist.active {
   background: linear-gradient(135deg, ${THEME.githubgistDim}44, ${THEME.githubgist}22);
   color: ${THEME.githubgist}; border-color: ${THEME.githubgist}44;
@@ -1151,6 +1346,7 @@
 .sf-sort-select.openuserjs:focus { border-color: ${THEME.openuserjs}44; }
 .sf-sort-select.chromewebstore:focus { border-color: ${THEME.chromewebstore}44; }
 .sf-sort-select.mozillaaddons:focus { border-color: ${THEME.mozillaaddons}44; }
+.sf-sort-select.catalogs:focus { border-color: ${THEME.catalogs}44; }
 .sf-sort-select.githubgist:focus { border-color: ${THEME.githubgist}44; }
 .sf-sort-select.github:focus { border-color: ${THEME.github}44; }
 
@@ -1180,6 +1376,7 @@
 .sf-item.openuserjs:hover::after { background: linear-gradient(180deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}); }
 .sf-item.chromewebstore:hover::after { background: linear-gradient(180deg, ${THEME.chromewebstoreDim}, ${THEME.chromewebstore}); }
 .sf-item.mozillaaddons:hover::after { background: linear-gradient(180deg, ${THEME.mozillaaddonsDim}, ${THEME.mozillaaddons}); }
+.sf-item.catalogs:hover::after { background: linear-gradient(180deg, ${THEME.catalogsDim}, ${THEME.catalogs}); }
 .sf-item.githubgist:hover::after { background: linear-gradient(180deg, ${THEME.githubgistDim}, ${THEME.githubgist}); }
 .sf-item.github:hover::after { background: linear-gradient(180deg, ${THEME.github}, ${THEME.peach}); }
 .sf-item:last-child { border-bottom: none; }
@@ -1203,6 +1400,7 @@
 .sf-item.openuserjs .sf-script-title:hover { color: ${THEME.openuserjs}; }
 .sf-item.chromewebstore .sf-script-title:hover { color: ${THEME.chromewebstore}; }
 .sf-item.mozillaaddons .sf-script-title:hover { color: ${THEME.mozillaaddons}; }
+.sf-item.catalogs .sf-script-title:hover { color: ${THEME.catalogs}; }
 .sf-item.githubgist .sf-script-title:hover { color: ${THEME.githubgist}; }
 .sf-item.github .sf-script-title:hover { color: ${THEME.github}; }
 
@@ -1231,6 +1429,8 @@
 .sf-item.chromewebstore .sf-install-btn:hover { background: ${THEME.chromewebstore}44; }
 .sf-item.mozillaaddons .sf-install-btn { background: ${THEME.mozillaaddons}22; color: ${THEME.mozillaaddons}; }
 .sf-item.mozillaaddons .sf-install-btn:hover { background: ${THEME.mozillaaddons}44; }
+.sf-item.catalogs .sf-install-btn { background: ${THEME.catalogs}22; color: ${THEME.catalogs}; }
+.sf-item.catalogs .sf-install-btn:hover { background: ${THEME.catalogs}44; }
 .sf-item.githubgist .sf-install-btn { background: ${THEME.githubgist}22; color: ${THEME.githubgist}; }
 .sf-item.githubgist .sf-install-btn:hover { background: ${THEME.githubgist}44; }
 .sf-item.github .sf-install-btn { background: ${THEME.github}22; color: ${THEME.github}; }
@@ -1265,6 +1465,7 @@
 .sf-spinner.openuserjs { border-top-color: ${THEME.openuserjs}; }
 .sf-spinner.chromewebstore { border-top-color: ${THEME.chromewebstore}; }
 .sf-spinner.mozillaaddons { border-top-color: ${THEME.mozillaaddons}; }
+.sf-spinner.catalogs { border-top-color: ${THEME.catalogs}; }
 .sf-spinner.githubgist { border-top-color: ${THEME.githubgist}; }
 .sf-spinner.github { border-top-color: ${THEME.github}; }
 .sf-loading-text { font: 500 13px/1 inherit; color: ${THEME.subtext0}; }
@@ -1285,6 +1486,7 @@
 .sf-action-btn.openuserjs { background: linear-gradient(135deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}88); }
 .sf-action-btn.chromewebstore { background: linear-gradient(135deg, ${THEME.chromewebstoreDim}, ${THEME.chromewebstore}88); }
 .sf-action-btn.mozillaaddons { background: linear-gradient(135deg, ${THEME.mozillaaddonsDim}, ${THEME.mozillaaddons}88); }
+.sf-action-btn.catalogs { background: linear-gradient(135deg, ${THEME.catalogsDim}, ${THEME.catalogs}88); }
 .sf-action-btn.githubgist { background: linear-gradient(135deg, ${THEME.githubgistDim}, ${THEME.githubgist}88); }
 .sf-action-btn.github { background: linear-gradient(135deg, ${THEME.githubDim}, ${THEME.github}88); }
 
@@ -1302,6 +1504,7 @@
 .sf-footer a.openuserjs { color: ${THEME.openuserjs}; }
 .sf-footer a.chromewebstore { color: ${THEME.chromewebstore}; }
 .sf-footer a.mozillaaddons { color: ${THEME.mozillaaddons}; }
+.sf-footer a.catalogs { color: ${THEME.catalogs}; }
 .sf-footer a.githubgist { color: ${THEME.githubgist}; }
 .sf-footer a.github { color: ${THEME.github}; }
 
@@ -1358,6 +1561,7 @@
         openuserjs: new OpenUserJSScriptService(),
         chromewebstore: new ChromeWebStoreService(),
         mozillaaddons: new MozillaAddonsService(),
+        catalogs: new CatalogScriptService(),
         githubgist: new GitHubGistService(),
         github: new GitHubScriptService()
       };
@@ -1424,6 +1628,7 @@
           <button class="sf-tab openuserjs" data-service="openuserjs">OpenUserJS</button>
           <button class="sf-tab chromewebstore" data-service="chromewebstore">Chrome</button>
           <button class="sf-tab mozillaaddons" data-service="mozillaaddons">Firefox</button>
+          <button class="sf-tab catalogs" data-service="catalogs">Catalogs</button>
           <button class="sf-tab githubgist" data-service="githubgist">Gists</button>
           <button class="sf-tab github" data-service="github">GitHub</button>
         </div>
@@ -1570,6 +1775,9 @@
       window._sfMenuIds.push(GM_registerMenuCommand(`Find Extensions for ${domain} (Mozilla AMO)`, () => {
         this._ensureUI(); this.currentService = "mozillaaddons"; this._open();
       }));
+      window._sfMenuIds.push(GM_registerMenuCommand(`Find Catalogs for ${domain} (Awesome/Tampermonkey)`, () => {
+        this._ensureUI(); this.currentService = "catalogs"; this._open();
+      }));
       window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (GitHub Gists)`, () => {
         this._ensureUI(); this.currentService = "githubgist"; this._open();
       }));
@@ -1614,7 +1822,7 @@
 
     _updateServiceColors() {
       const svc = this.currentService;
-      const svcNames = ["greasyfork", "sleazyfork", "openuserjs", "chromewebstore", "mozillaaddons", "githubgist", "github"];
+      const svcNames = ["greasyfork", "sleazyfork", "openuserjs", "chromewebstore", "mozillaaddons", "catalogs", "githubgist", "github"];
       const header = this.modal.querySelector(".sf-modal-header");
       svcNames.forEach(s => header.classList.toggle(s, s === svc));
       svcNames.forEach(s => this.sortSelect.classList.toggle(s, s === svc));
@@ -1623,8 +1831,8 @@
       const footerLink = this.modal.querySelector(".sf-footer a");
       if (footerLink) {
         svcNames.forEach(s => footerLink.classList.toggle(s, s === svc));
-        const labels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", githubgist: "GitHub Gists", github: "GitHub" };
-        const urls = { greasyfork: "https://greasyfork.org", sleazyfork: "https://sleazyfork.org", openuserjs: "https://openuserjs.org", chromewebstore: "https://chromewebstore.google.com", mozillaaddons: "https://addons.mozilla.org", githubgist: "https://gist.github.com", github: "https://github.com" };
+        const labels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", catalogs: "Script Catalogs", githubgist: "GitHub Gists", github: "GitHub" };
+        const urls = { greasyfork: "https://greasyfork.org", sleazyfork: "https://sleazyfork.org", openuserjs: "https://openuserjs.org", chromewebstore: "https://chromewebstore.google.com", mozillaaddons: "https://addons.mozilla.org", catalogs: "https://github.com/awesome-scripts/awesome-userscripts", githubgist: "https://gist.github.com", github: "https://github.com" };
         footerLink.textContent = labels[svc];
         footerLink.href = urls[svc];
       }
@@ -1633,7 +1841,7 @@
     _setResultCount(count) {
       const countEl = this.modal.querySelector(".sf-subtitle-count");
       const textEl = this.modal.querySelector(".sf-subtitle-text");
-      const units = { github: "repo", githubgist: "gist", chromewebstore: "extension", mozillaaddons: "extension" };
+      const units = { github: "repo", githubgist: "gist", catalogs: "catalog result", chromewebstore: "extension", mozillaaddons: "extension" };
       const unit = units[this.currentService] || "script";
       if (countEl) countEl.textContent = count || 0;
       if (textEl) textEl.textContent = count === 1 ? `${unit} found` : `${unit}s found`;
@@ -1645,7 +1853,7 @@
       this.isLoading = true;
       const svc = this.services[this.currentService];
       const svcClass = this.currentService === "greasyfork" ? "" : this.currentService;
-      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", githubgist: "GitHub Gists", github: "GitHub" };
+      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", catalogs: "Script Catalogs", githubgist: "GitHub Gists", github: "GitHub" };
       const svcLabel = svcLabels[this.currentService];
 
       _safeHTML(this.content, `<div class="sf-loading"><div class="sf-spinner ${svcClass}"></div><div class="sf-loading-text">Searching ${svcLabel}...</div></div>`);
@@ -1687,12 +1895,12 @@
     _displayScripts() {
       let scripts = this.allScripts || [];
       const svcClass = this.currentService === "greasyfork" ? "" : this.currentService;
-      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", githubgist: "GitHub Gists", github: "GitHub" };
+      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", catalogs: "Script Catalogs", githubgist: "GitHub Gists", github: "GitHub" };
       const svcLabel = svcLabels[this.currentService];
       const displayHost = HostService.extractRootDomain(this.currentDomain);
 
       // Update title
-      const titleType = this.currentService === "githubgist" ? "Gists" : ["chromewebstore", "mozillaaddons"].includes(this.currentService) ? "Extensions" : "Scripts";
+      const titleType = this.currentService === "catalogs" ? "Catalogs" : this.currentService === "githubgist" ? "Gists" : ["chromewebstore", "mozillaaddons"].includes(this.currentService) ? "Extensions" : "Scripts";
       this.modal.querySelector(".sf-modal-title").textContent = `${titleType} for ${displayHost}`;
 
       // Filter by search
@@ -1702,6 +1910,8 @@
           (s.description || "").toLowerCase().includes(this.searchQuery) ||
           (s.users?.[0]?.name || "").toLowerCase().includes(this.searchQuery) ||
           (s._full_name || "").toLowerCase().includes(this.searchQuery) ||
+          (s._catalog_source || "").toLowerCase().includes(this.searchQuery) ||
+          (s._category || "").toLowerCase().includes(this.searchQuery) ||
           (s._topics || []).some(t => t.toLowerCase().includes(this.searchQuery))
         );
       }
@@ -1743,6 +1953,7 @@
       const isGH = script._source === "github";
       const isCWS = script._source === "chromewebstore";
       const isAMO = script._source === "mozillaaddons";
+      const isCatalog = script._source === "catalogs";
       const isGist = script._source === "githubgist";
       const daily = formatNumber(script.daily_installs);
       const total = formatNumber(script.total_installs);
@@ -1753,7 +1964,7 @@
       const created = relativeTime(script.created_at);
       const author = script.users?.[0]?.name || null;
       const baseUrls = { sleazyfork: "https://sleazyfork.org", greasyfork: "https://greasyfork.org", openuserjs: "https://openuserjs.org" };
-      const scriptUrl = (isGH || isGist) ? script.url : (script.url?.startsWith("http") ? script.url : (baseUrls[svcClass] || baseUrls.greasyfork) + (script.url || ""));
+      const scriptUrl = (isGH || isGist || isCatalog) ? script.url : (script.url?.startsWith("http") ? script.url : (baseUrls[svcClass] || baseUrls.greasyfork) + (script.url || ""));
       const installUrl = script.code_url || null;
 
       const fanClass = fanScore >= 8 ? "score-high" : fanScore >= 6 ? "score-mid" : fanScore >= 0 ? "score-low" : "";
@@ -1786,6 +1997,12 @@
           ${badge("gitFork", forks, "Forks")}
           ${badge("clockwise", updated, "Last active")}
         `;
+      } else if (isCatalog) {
+        metaHtml = `
+          ${badge("search", script._catalog_source, "Catalog source")}
+          ${badge("gitBranch", script._category, "Category")}
+          ${badge("clockwise", updated, "Updated")}
+        `;
       } else if (isCWS || isAMO) {
         const totalUsers = formatNumber(script.total_installs);
         const rating = script._rating != null ? Number(script._rating).toFixed(1) : null;
@@ -1809,9 +2026,9 @@
 
       // Non-userscript sources get a "View" button; script registries get "Install".
       let actionBtn;
-      if (isGH || isCWS || isAMO || (isGist && !installUrl)) {
+      if (isGH || isCWS || isAMO || (isGist && !installUrl) || (isCatalog && !installUrl)) {
         const icon = (isGH || isGist) ? "githubLogo" : "search";
-        const title = isGH ? "View repository" : isGist ? "View gist" : "View extension";
+        const title = isGH ? "View repository" : isGist ? "View gist" : isCatalog ? "Open catalog result" : "View extension";
         actionBtn = `<button class="sf-install-btn" data-url="${escapeHtml(scriptUrl)}" title="${title}">${getIcon(icon)} View</button>`;
       } else if (installUrl) {
         actionBtn = `<button class="sf-install-btn" data-url="${escapeHtml(installUrl)}" title="Install script">${getIcon('install')} Install</button>`;
@@ -1824,7 +2041,7 @@
           <div class="sf-script-info">
             <a href="${escapeHtml(scriptUrl)}" target="_blank" class="sf-script-title" title="${escapeHtml(script.name || '')}">${escapeHtml(script.name || "Untitled")}</a>
             <div class="sf-script-sub">
-              ${author ? `<span title="${isGH || isGist ? 'Owner' : 'Author'}">${getIcon('user')} ${escapeHtml(author)}</span>` : ""}
+              ${author ? `<span title="${isGH || isGist ? 'Owner' : isCatalog ? 'Catalog' : 'Author'}">${getIcon('user')} ${escapeHtml(author)}</span>` : ""}
               ${author && script.version ? `<span class="sf-dot">&bull;</span>` : ""}
               ${script.version ? `<span title="Version">${getIcon('gitBranch')} v${escapeHtml(script.version)}</span>` : ""}
               ${(author || script.version) && script.license ? `<span class="sf-dot">&bull;</span>` : ""}
