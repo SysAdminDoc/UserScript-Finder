@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.11.0
+// @version      1.12.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -1946,6 +1946,7 @@
       this.sourceStatus = null;
       this.searchQuery = "";
       this.settingsOpen = false;
+      this.previousFocus = null;
       this.uiBuilt = false;
     }
 
@@ -1974,40 +1975,45 @@
       // Modal
       this.modal = document.createElement("div");
       this.modal.className = "sf-modal";
+      this.modal.setAttribute("role", "dialog");
+      this.modal.setAttribute("aria-modal", "true");
+      this.modal.setAttribute("aria-labelledby", "sf-modal-title");
+      this.modal.setAttribute("aria-describedby", "sf-modal-subtitle");
+      this.modal.setAttribute("tabindex", "-1");
       _safeHTML(this.modal, `
         <div class="sf-modal-header">
           <div class="sf-header-row">
             <div class="sf-header-left">
-              <h2 class="sf-modal-title">Scripts for this site</h2>
-              <p class="sf-modal-subtitle">
+              <h2 class="sf-modal-title" id="sf-modal-title">Scripts for this site</h2>
+              <p class="sf-modal-subtitle" id="sf-modal-subtitle" aria-live="polite">
                 <span class="sf-subtitle-count">0</span>
                 <span class="sf-subtitle-text">scripts found</span>
               </p>
             </div>
-            <button class="sf-header-btn sf-btn-settings" title="Settings">${getIcon('gear')}</button>
-            <button class="sf-header-btn sf-btn-close" title="Close">${getIcon('x')}</button>
+            <button class="sf-header-btn sf-btn-settings" title="Settings" aria-label="Settings">${getIcon('gear')}</button>
+            <button class="sf-header-btn sf-btn-close" title="Close" aria-label="Close">${getIcon('x')}</button>
           </div>
         </div>
         <div class="sf-search-wrap">
           <div class="sf-search-box">
             ${getIcon('search')}
-            <input class="sf-search-input" type="text" placeholder="Filter scripts..." spellcheck="false" />
+            <input class="sf-search-input" type="text" placeholder="Filter scripts..." spellcheck="false" aria-label="Filter results" />
             <span class="sf-search-count"></span>
           </div>
         </div>
-        <div class="sf-tabs">
-          <button class="sf-tab active" data-service="greasyfork">GreasyFork</button>
-          <button class="sf-tab sleazyfork" data-service="sleazyfork">SleazyFork</button>
-          <button class="sf-tab openuserjs" data-service="openuserjs">OpenUserJS</button>
-          <button class="sf-tab chromewebstore" data-service="chromewebstore">Chrome</button>
-          <button class="sf-tab mozillaaddons" data-service="mozillaaddons">Firefox</button>
-          <button class="sf-tab catalogs" data-service="catalogs">Catalogs</button>
-          <button class="sf-tab githubgist" data-service="githubgist">Gists</button>
-          <button class="sf-tab github" data-service="github">GitHub</button>
+        <div class="sf-tabs" role="tablist" aria-label="Result sources">
+          <button class="sf-tab active" role="tab" aria-selected="true" data-service="greasyfork">GreasyFork</button>
+          <button class="sf-tab sleazyfork" role="tab" aria-selected="false" data-service="sleazyfork">SleazyFork</button>
+          <button class="sf-tab openuserjs" role="tab" aria-selected="false" data-service="openuserjs">OpenUserJS</button>
+          <button class="sf-tab chromewebstore" role="tab" aria-selected="false" data-service="chromewebstore">Chrome</button>
+          <button class="sf-tab mozillaaddons" role="tab" aria-selected="false" data-service="mozillaaddons">Firefox</button>
+          <button class="sf-tab catalogs" role="tab" aria-selected="false" data-service="catalogs">Catalogs</button>
+          <button class="sf-tab githubgist" role="tab" aria-selected="false" data-service="githubgist">Gists</button>
+          <button class="sf-tab github" role="tab" aria-selected="false" data-service="github">GitHub</button>
         </div>
         <div class="sf-sort-bar">
           <span class="sf-sort-label">Sort by</span>
-          <select class="sf-sort-select">
+          <select class="sf-sort-select" aria-label="Sort results">
             <option value="daily">Daily installs</option>
             <option value="total">Total installs</option>
             <option value="good">Ratings</option>
@@ -2019,22 +2025,22 @@
         </div>
         <div class="sf-filter-bar">
           <span class="sf-sort-label">Filters</span>
-          <select class="sf-filter-select" data-filter="updatedMonths" title="Updated within">
+          <select class="sf-filter-select" data-filter="updatedMonths" title="Updated within" aria-label="Updated within">
             <option value="any">Any update</option>
             <option value="3">3 months</option>
             <option value="6">6 months</option>
             <option value="12">12 months</option>
             <option value="24">24 months</option>
           </select>
-          <select class="sf-filter-select" data-filter="minRating" title="Minimum rating">
+          <select class="sf-filter-select" data-filter="minRating" title="Minimum rating" aria-label="Minimum rating">
             <option value="any">Any rating</option>
             <option value="3">3+ rating</option>
             <option value="4">4+ rating</option>
             <option value="4.5">4.5+ rating</option>
           </select>
-          <button class="sf-filter-toggle" data-filter="englishOnly" title="English-looking names and descriptions">English</button>
+          <button class="sf-filter-toggle" data-filter="englishOnly" title="English-looking names and descriptions" aria-label="Toggle English-looking filter" aria-pressed="false">English</button>
         </div>
-        <div class="sf-content">
+        <div class="sf-content" aria-live="polite" aria-busy="false">
           <div class="sf-loading">
             <div class="sf-spinner"></div>
             <div class="sf-loading-text">Searching...</div>
@@ -2122,6 +2128,7 @@
       this.modal.querySelector(".sf-filter-toggle").addEventListener("click", e => {
         this.filters.englishOnly = !this.filters.englishOnly;
         e.currentTarget.classList.toggle("active", this.filters.englishOnly);
+        e.currentTarget.setAttribute("aria-pressed", String(this.filters.englishOnly));
         this._displayScripts();
       });
 
@@ -2155,7 +2162,11 @@
 
       // Outside click / Escape
       document.addEventListener("click", e => { if (this.isOpen && !this.host.contains(e.target)) this._close(); });
-      document.addEventListener("keydown", e => { if (e.key === "Escape" && this.isOpen) this._close(); });
+      document.addEventListener("keydown", e => {
+        if (!this.isOpen) return;
+        if (e.key === "Escape") this._close();
+        else if (e.key === "Tab") this._trapFocus(e);
+      });
     }
 
     // ── Menu commands ───────────────────────────────────────────────
@@ -2196,15 +2207,41 @@
       }));
     }
 
+    _focusableElements() {
+      return Array.from(this.modal.querySelectorAll('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+        .filter(el => !el.disabled && el.getAttribute("aria-hidden") !== "true" && el.offsetParent !== null);
+    }
+
+    _trapFocus(event) {
+      const focusable = this._focusableElements();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = this.shadow.activeElement || document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      } else if (!focusable.includes(active)) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
     // ── Modal control ───────────────────────────────────────────────
     _open() {
       this.isOpen = true;
+      this.previousFocus = document.activeElement;
       this._updateTabs();
       this._updateServiceColors();
       this.sortSelect.value = this.currentSort;
       this.modal.classList.add("visible");
       this.searchInput.value = "";
       this.searchQuery = "";
+      requestAnimationFrame(() => this.searchInput.focus({ preventScroll: true }));
       this._loadScripts();
     }
 
@@ -2213,6 +2250,9 @@
       this.settingsOpen = false;
       this.modal.querySelector(".sf-settings").classList.remove("visible");
       this.modal.classList.remove("visible");
+      if (this.previousFocus && typeof this.previousFocus.focus === "function") {
+        this.previousFocus.focus({ preventScroll: true });
+      }
     }
 
     _toggleSettings() {
@@ -2222,7 +2262,11 @@
 
     // ── Tab/color updates ───────────────────────────────────────────
     _updateTabs() {
-      this.modal.querySelectorAll(".sf-tab").forEach(t => t.classList.toggle("active", t.dataset.service === this.currentService));
+      this.modal.querySelectorAll(".sf-tab").forEach(t => {
+        const active = t.dataset.service === this.currentService;
+        t.classList.toggle("active", active);
+        t.setAttribute("aria-selected", String(active));
+      });
       this._updateServiceColors();
     }
 
@@ -2283,6 +2327,7 @@
       const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", catalogs: "Script Catalogs", githubgist: "GitHub Gists", github: "GitHub" };
       const svcLabel = svcLabels[this.currentService];
 
+      this.content.setAttribute("aria-busy", "true");
       _safeHTML(this.content, `<div class="sf-loading"><div class="sf-spinner ${svcClass}"></div><div class="sf-loading-text">Searching ${svcLabel}...</div></div>`);
 
       try {
@@ -2309,6 +2354,7 @@
         this.content.querySelector(".sf-action-btn")?.addEventListener("click", () => this._loadScripts());
       } finally {
         this.isLoading = false;
+        this.content.setAttribute("aria-busy", "false");
       }
     }
 

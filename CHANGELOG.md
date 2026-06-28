@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.12.0] - 2026-06-28
+
+- Added modal accessibility semantics, live result/status announcements, accessible control names, focus entry/restoration, contained Tab navigation, and accessibility markup tests.
+
 ## [v1.11.0] - 2026-06-28
 
 - Added public-suffix-aware host normalization for common multi-label and hosted suffixes, exact-host searching before root fallback, and HostService tests for `co.uk`, `com.au`, `github.io`, mobile prefixes, localhost, and IP hosts.

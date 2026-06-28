@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.11.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.12.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -81,6 +81,7 @@ Click your userscript manager icon on any website and pick a source to search:
 | **Dense Mode** | Toggle compact view — hides descriptions and tightens padding for fast scanning |
 | **Relative Timestamps** | Shows `3d ago`, `2mo ago`, `just now` instead of raw ISO dates |
 | **Inline Settings** | Gear icon opens settings within the modal — no external menus to navigate |
+| **Accessible Modal** | Uses dialog semantics, live result announcements, accessible control names, focus entry/restoration, and contained Tab navigation |
 | **Persistent Preferences** | Remembers your last-used source, sort order, dense mode, and cache duration |
 | **Domain-Aware** | Automatically detects the current site and strips `www.`/`m.`/`mobile.` prefixes |
 | **Public-Suffix Aware Matching** | Normalizes common multi-label and hosted suffixes such as `co.uk`, `com.au`, `github.io`, `pages.dev`, and `netlify.app` before root-domain fallback |
