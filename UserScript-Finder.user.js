@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
-// @description  Finds GreasyFork/SleazyFork/GitHub scripts for the current domain
+// @version      1.1.0
+// @description  Finds GreasyFork/SleazyFork/OpenUserJS/GitHub scripts for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
 // @grant        GM_xmlhttpRequest
@@ -16,6 +16,7 @@
 // @icon         https://raw.githubusercontent.com/SysAdminDoc/UserScript-Finder/main/img/icon.png
 // @connect      greasyfork.org
 // @connect      sleazyfork.org
+// @connect      openuserjs.org
 // @connect      api.github.com
 // @connect      raw.githubusercontent.com
 // @license      WTFPL
@@ -76,6 +77,9 @@
     glassHover: 'rgba(255, 255, 255, 0.03)',
     glow:     'rgba(166, 227, 161, 0.15)',
     glowPurple: 'rgba(203, 166, 247, 0.15)',
+    openuserjs: '#89b4fa',
+    openuserjsDim: '#4f7fd8',
+    glowOpenUserJS: 'rgba(137, 180, 250, 0.15)',
     github:     '#f0883e',
     githubDim:  '#d2691e',
     glowGithub: 'rgba(240, 136, 62, 0.15)',
@@ -134,6 +138,7 @@
   }
 
   function formatNumber(num) {
+    if (num === null || num === undefined || num === "") return null;
     const n = Number(num);
     if (!Number.isFinite(n)) return null;
     if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.0', '') + 'M';
@@ -228,6 +233,132 @@
     }
 
     getDirectSearchUrl(domain) { return `${this.baseUrl}/scripts/by-site/${domain}`; }
+  }
+
+  // OpenUserJS search is HTML-only; parse its script table into the shared result shape.
+  class OpenUserJSScriptService {
+    constructor() {
+      this.serviceName = "openuserjs";
+      this.baseUrl = "https://openuserjs.org";
+      this.cache = new Map();
+    }
+
+    async searchScriptsByHost(host, settings) {
+      let scripts = await this._searchWithDomain(host, settings);
+      if (scripts.length === 0) {
+        const root = HostService.extractRootDomain(host);
+        if (root !== host) scripts = await this._searchWithDomain(root, settings);
+      }
+      return scripts;
+    }
+
+    async _searchWithDomain(domain, settings) {
+      const cacheKey = `openuserjs_${domain}`;
+      const cacheDuration = settings.get("cacheDuration");
+      const cached = this.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < cacheDuration) return cached.data;
+
+      let scripts = [];
+      try {
+        const html = await this._fetchSearch(domain);
+        scripts = this._parseSearchResults(html);
+      } catch {
+        scripts = [];
+      }
+
+      const filtered = this._filter(scripts, domain);
+      this.cache.set(cacheKey, { data: filtered, timestamp: Date.now() });
+      return filtered;
+    }
+
+    _fetchSearch(domain) {
+      return this._fetch(`${this.baseUrl}/?q=${encodeURIComponent(domain)}&orderBy=updated&orderDir=desc`);
+    }
+
+    _fetch(url) {
+      return new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+          method: "GET", url,
+          headers: { Accept: "text/html,application/xhtml+xml" },
+          onload: r => {
+            if (r.status === 200) resolve(r.responseText || "");
+            else if (r.status === 404) resolve("");
+            else reject(new Error(`OpenUserJS ${r.status}`));
+          },
+          onerror: reject
+        });
+      });
+    }
+
+    _parseSearchResults(html) {
+      if (!html || typeof DOMParser !== "function") return [];
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const rows = Array.from(doc.querySelectorAll("tbody tr.tr-link"));
+      const seen = new Set();
+
+      return rows.map(row => this._normalizeRow(row)).filter(script => {
+        if (!script || seen.has(script.url)) return false;
+        seen.add(script.url);
+        return true;
+      }).slice(0, 100);
+    }
+
+    _normalizeRow(row) {
+      const link = row.querySelector('a.tr-link-a[href^="/scripts/"]') ||
+        row.querySelector('a[href^="/scripts/"]');
+      if (!link) return null;
+
+      const pagePath = link.getAttribute("href");
+      const cells = Array.from(row.querySelectorAll("td"));
+      const infoCell = cells[0] || row;
+      const authorLink = infoCell.querySelector('span.inline-block a[href^="/users/"]') ||
+        infoCell.querySelector('a[href^="/users/"]');
+      const versionEl = infoCell.querySelector(".script-version");
+      const descEl = infoCell.querySelector("p");
+      const updatedEl = row.querySelector("time[datetime]");
+      const authorFromPath = this._decodePathSegment(pagePath.split("/")[2]);
+      const installPath = pagePath.replace(/^\/scripts\//, "/install/") + ".user.js";
+
+      return {
+        _source: "openuserjs",
+        name: this._cleanText(link.textContent) || "Untitled",
+        description: this._cleanText(descEl?.textContent) || "",
+        url: this.baseUrl + pagePath,
+        code_url: this.baseUrl + installPath,
+        version: this._cleanText(versionEl?.textContent) || null,
+        license: null,
+        users: [{ name: this._cleanText(authorLink?.textContent) || authorFromPath || null }],
+        daily_installs: null,
+        total_installs: this._parseNumber(cells[1]?.textContent),
+        good_ratings: this._parseNumber(cells[2]?.textContent),
+        fan_score: null,
+        code_updated_at: updatedEl?.getAttribute("datetime") || null,
+        created_at: null,
+        _full_name: pagePath.replace(/^\/scripts\//, ""),
+        _topics: []
+      };
+    }
+
+    _filter(scripts) {
+      return scripts.slice(0, 100);
+    }
+
+    _parseNumber(text) {
+      const cleaned = String(text || "").replace(/,/g, "").match(/\d+(?:\.\d+)?/);
+      return cleaned ? Number(cleaned[0]) : null;
+    }
+
+    _decodePathSegment(segment) {
+      if (!segment) return null;
+      try { return decodeURIComponent(segment.replace(/\+/g, "%20")); }
+      catch { return segment; }
+    }
+
+    _cleanText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
+
+    getDirectSearchUrl(domain) {
+      return `${this.baseUrl}/?q=${encodeURIComponent(domain)}`;
+    }
   }
 
   // ── GitHub Script Service ───────────────────────────────────────────
@@ -443,6 +574,7 @@
   transition: background 0.3s ease;
 }
 .sf-modal-header.sleazyfork::before { background: linear-gradient(90deg, ${THEME.purple}, ${THEME.mauve}); }
+.sf-modal-header.openuserjs::before { background: linear-gradient(90deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}); }
 .sf-modal-header.github::before { background: linear-gradient(90deg, ${THEME.github}, ${THEME.peach}); }
 
 .sf-header-row { display: flex; align-items: center; gap: 12px; }
@@ -487,6 +619,7 @@
 }
 .sf-search-box:focus-within { border-color: ${THEME.green}33; box-shadow: 0 0 0 3px ${THEME.green}11; }
 .sf-search-box.sleazyfork:focus-within { border-color: ${THEME.purple}33; box-shadow: 0 0 0 3px ${THEME.purple}11; }
+.sf-search-box.openuserjs:focus-within { border-color: ${THEME.openuserjs}33; box-shadow: 0 0 0 3px ${THEME.openuserjs}11; }
 .sf-search-box.github:focus-within { border-color: ${THEME.github}33; box-shadow: 0 0 0 3px ${THEME.github}11; }
 .sf-search-box svg { width: 14px; height: 14px; color: ${THEME.overlay}; flex-shrink: 0; }
 .sf-search-input {
@@ -499,7 +632,7 @@
 
 /* Tabs */
 .sf-tabs {
-  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;
   padding: 10px 20px; background: ${THEME.surface0}44;
   border-bottom: 1px solid ${THEME.glassBorder};
 }
@@ -519,6 +652,11 @@
   background: linear-gradient(135deg, ${THEME.purpleDim}44, ${THEME.purple}22);
   color: ${THEME.purple}; border-color: ${THEME.purple}33;
   box-shadow: 0 0 16px ${THEME.glowPurple};
+}
+.sf-tab.openuserjs.active {
+  background: linear-gradient(135deg, ${THEME.openuserjsDim}44, ${THEME.openuserjs}22);
+  color: ${THEME.openuserjs}; border-color: ${THEME.openuserjs}33;
+  box-shadow: 0 0 16px ${THEME.glowOpenUserJS};
 }
 .sf-tab.github.active {
   background: linear-gradient(135deg, ${THEME.githubDim}44, ${THEME.github}22);
@@ -542,6 +680,7 @@
 .sf-sort-select option { background: ${THEME.surface1}; color: ${THEME.text}; }
 .sf-sort-select:focus { border-color: ${THEME.green}44; }
 .sf-sort-select.sleazyfork:focus { border-color: ${THEME.purple}44; }
+.sf-sort-select.openuserjs:focus { border-color: ${THEME.openuserjs}44; }
 .sf-sort-select.github:focus { border-color: ${THEME.github}44; }
 
 /* Content */
@@ -567,6 +706,7 @@
   background: linear-gradient(180deg, ${THEME.green}, ${THEME.teal});
 }
 .sf-item.sleazyfork:hover::after { background: linear-gradient(180deg, ${THEME.purple}, ${THEME.mauve}); }
+.sf-item.openuserjs:hover::after { background: linear-gradient(180deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}); }
 .sf-item.github:hover::after { background: linear-gradient(180deg, ${THEME.github}, ${THEME.peach}); }
 .sf-item:last-child { border-bottom: none; }
 
@@ -586,6 +726,7 @@
 }
 .sf-script-title:hover { color: ${THEME.green}; }
 .sf-item.sleazyfork .sf-script-title:hover { color: ${THEME.purple}; }
+.sf-item.openuserjs .sf-script-title:hover { color: ${THEME.openuserjs}; }
 .sf-item.github .sf-script-title:hover { color: ${THEME.github}; }
 
 .sf-script-sub {
@@ -607,6 +748,8 @@
 .sf-install-btn svg { width: 14px; height: 14px; }
 .sf-item.sleazyfork .sf-install-btn { background: ${THEME.purple}22; color: ${THEME.purple}; }
 .sf-item.sleazyfork .sf-install-btn:hover { background: ${THEME.purple}44; }
+.sf-item.openuserjs .sf-install-btn { background: ${THEME.openuserjs}22; color: ${THEME.openuserjs}; }
+.sf-item.openuserjs .sf-install-btn:hover { background: ${THEME.openuserjs}44; }
 .sf-item.github .sf-install-btn { background: ${THEME.github}22; color: ${THEME.github}; }
 .sf-item.github .sf-install-btn:hover { background: ${THEME.github}44; }
 
@@ -636,6 +779,7 @@
   animation: sfSpin 0.7s linear infinite;
 }
 .sf-spinner.sleazyfork { border-top-color: ${THEME.purple}; }
+.sf-spinner.openuserjs { border-top-color: ${THEME.openuserjs}; }
 .sf-spinner.github { border-top-color: ${THEME.github}; }
 .sf-loading-text { font: 500 13px/1 inherit; color: ${THEME.subtext0}; }
 
@@ -652,6 +796,7 @@
 }
 .sf-action-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
 .sf-action-btn.sleazyfork { background: linear-gradient(135deg, ${THEME.purpleDim}, ${THEME.purple}88); }
+.sf-action-btn.openuserjs { background: linear-gradient(135deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}88); }
 .sf-action-btn.github { background: linear-gradient(135deg, ${THEME.githubDim}, ${THEME.github}88); }
 
 /* Footer */
@@ -665,6 +810,7 @@
 .sf-footer a { color: ${THEME.green}; text-decoration: none; font-weight: 700; }
 .sf-footer a:hover { text-decoration: underline; }
 .sf-footer a.sleazyfork { color: ${THEME.purple}; }
+.sf-footer a.openuserjs { color: ${THEME.openuserjs}; }
 .sf-footer a.github { color: ${THEME.github}; }
 
 /* Settings panel */
@@ -703,7 +849,7 @@
 @media (max-width: 520px) {
   .sf-modal { width: calc(100vw - 24px); right: 12px; max-height: min(88vh, 700px); }
   .sf-modal-header { padding: 14px 16px; }
-  .sf-tabs { padding: 8px 16px; }
+  .sf-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 8px 16px; }
   .sf-sort-bar, .sf-search-wrap { padding-left: 16px; padding-right: 16px; }
   .sf-item { padding: 12px 16px; }
   .sf-footer { padding: 10px 16px; flex-wrap: wrap; justify-content: center; }
@@ -717,6 +863,7 @@
       this.services = {
         greasyfork: new ScriptService("https://greasyfork.org", "greasyfork"),
         sleazyfork: new ScriptService("https://sleazyfork.org", "sleazyfork"),
+        openuserjs: new OpenUserJSScriptService(),
         github: new GitHubScriptService()
       };
       this.currentService = this.settings.get("lastService") || "greasyfork";
@@ -779,6 +926,7 @@
         <div class="sf-tabs">
           <button class="sf-tab active" data-service="greasyfork">GreasyFork</button>
           <button class="sf-tab sleazyfork" data-service="sleazyfork">SleazyFork</button>
+          <button class="sf-tab openuserjs" data-service="openuserjs">OpenUserJS</button>
           <button class="sf-tab github" data-service="github">GitHub</button>
         </div>
         <div class="sf-sort-bar">
@@ -915,6 +1063,9 @@
       window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (SleazyFork)`, () => {
         this._ensureUI(); this.currentService = "sleazyfork"; this._open();
       }));
+      window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (OpenUserJS)`, () => {
+        this._ensureUI(); this.currentService = "openuserjs"; this._open();
+      }));
       window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (GitHub)`, () => {
         this._ensureUI(); this.currentService = "github"; this._open();
       }));
@@ -956,7 +1107,7 @@
 
     _updateServiceColors() {
       const svc = this.currentService;
-      const svcNames = ["greasyfork", "sleazyfork", "github"];
+      const svcNames = ["greasyfork", "sleazyfork", "openuserjs", "github"];
       const header = this.modal.querySelector(".sf-modal-header");
       svcNames.forEach(s => header.classList.toggle(s, s === svc));
       svcNames.forEach(s => this.sortSelect.classList.toggle(s, s === svc));
@@ -965,8 +1116,8 @@
       const footerLink = this.modal.querySelector(".sf-footer a");
       if (footerLink) {
         svcNames.forEach(s => footerLink.classList.toggle(s, s === svc));
-        const labels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", github: "GitHub" };
-        const urls = { greasyfork: "https://greasyfork.org", sleazyfork: "https://sleazyfork.org", github: "https://github.com" };
+        const labels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", github: "GitHub" };
+        const urls = { greasyfork: "https://greasyfork.org", sleazyfork: "https://sleazyfork.org", openuserjs: "https://openuserjs.org", github: "https://github.com" };
         footerLink.textContent = labels[svc];
         footerLink.href = urls[svc];
       }
@@ -987,7 +1138,7 @@
       this.isLoading = true;
       const svc = this.services[this.currentService];
       const svcClass = this.currentService === "greasyfork" ? "" : this.currentService;
-      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", github: "GitHub" };
+      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", github: "GitHub" };
       const svcLabel = svcLabels[this.currentService];
 
       _safeHTML(this.content, `<div class="sf-loading"><div class="sf-spinner ${svcClass}"></div><div class="sf-loading-text">Searching ${svcLabel}...</div></div>`);
@@ -1016,7 +1167,7 @@
     _sortScripts(scripts) {
       const copy = [...scripts];
       switch (this.currentSort) {
-        case "daily": return copy.sort((a,b) => (b.daily_installs || b._stars || 0) - (a.daily_installs || a._stars || 0));
+        case "daily": return copy.sort((a,b) => (b.daily_installs || b.total_installs || b._stars || 0) - (a.daily_installs || a.total_installs || a._stars || 0));
         case "total": return copy.sort((a,b) => (b.total_installs || b._stars || 0) - (a.total_installs || a._stars || 0));
         case "good": return copy.sort((a,b) => (b.good_ratings || 0) - (a.good_ratings || 0));
         case "fanscore": return copy.sort((a,b) => (b.fan_score || b._forks || 0) - (a.fan_score || a._forks || 0));
@@ -1029,7 +1180,7 @@
     _displayScripts() {
       let scripts = this.allScripts || [];
       const svcClass = this.currentService === "greasyfork" ? "" : this.currentService;
-      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", github: "GitHub" };
+      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", github: "GitHub" };
       const svcLabel = svcLabels[this.currentService];
       const displayHost = HostService.extractRootDomain(this.currentDomain);
 
@@ -1090,7 +1241,7 @@
       const updated = relativeTime(script.code_updated_at);
       const created = relativeTime(script.created_at);
       const author = script.users?.[0]?.name || null;
-      const baseUrls = { sleazyfork: "https://sleazyfork.org", greasyfork: "https://greasyfork.org" };
+      const baseUrls = { sleazyfork: "https://sleazyfork.org", greasyfork: "https://greasyfork.org", openuserjs: "https://openuserjs.org" };
       const scriptUrl = isGH ? script.url : (script.url?.startsWith("http") ? script.url : (baseUrls[svcClass] || baseUrls.greasyfork) + (script.url || ""));
       const installUrl = script.code_url || null;
 
