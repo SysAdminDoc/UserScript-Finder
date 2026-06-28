@@ -81,13 +81,6 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
   Acceptance: One canonical SPDX license appears in the license file, README badge/text, userscript `@license`, and any release notes.
   Complexity: S
 
-- [ ] P0 - Make match-coverage evaluation spec-faithful
-  Why: The current coverage preview checks host only for `scheme://` patterns and can mark scripts compatible while ignoring scheme/path and include/exclude semantics.
-  Evidence: `UserScript-Finder.user.js` `_parseMatchCoverage`, `_patternCoversHost`; Greasespot metadata docs; Chrome/MDN match-pattern docs.
-  Touches: `UserScript-Finder.user.js` metadata parser, match evaluator, preview rendering, parser fixtures.
-  Acceptance: Fixtures cover `@match`, `@include`, `@exclude`, `<all_urls>`, wildcard hosts, schemes, paths, and exclude precedence with correct pass/fail labels.
-  Complexity: M
-
 - [ ] P0 - Add source timeouts, backoff, and stale-cache fallback
   Why: Adapter failures and rate limits can collapse into empty results, making outages look like no scripts exist.
   Evidence: `UserScript-Finder.user.js` adapter `_fetch` methods, `_loadScripts`; GitHub Search API rate-limit docs.

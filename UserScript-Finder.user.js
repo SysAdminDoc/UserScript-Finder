@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.7.0
+// @version      1.8.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -15,12 +15,14 @@
 // @grant        GM_deleteValue
 // @icon         https://raw.githubusercontent.com/SysAdminDoc/UserScript-Finder/main/img/icon.png
 // @connect      greasyfork.org
+// @connect      update.greasyfork.org
 // @connect      sleazyfork.org
 // @connect      openuserjs.org
 // @connect      chromewebstore.google.com
 // @connect      addons.mozilla.org
 // @connect      www.tampermonkey.net
 // @connect      gist.github.com
+// @connect      gist.githubusercontent.com
 // @connect      api.github.com
 // @connect      raw.githubusercontent.com
 // @license      WTFPL
@@ -187,6 +189,103 @@
     const latin = (text.match(/[A-Za-z]/g) || []).length;
     const nonLatin = (text.match(/[^\x00-\x7F]/g) || []).length;
     return nonLatin === 0 || latin / Math.max(latin + nonLatin, 1) >= 0.8;
+  }
+
+  const MatchCoverage = {
+    evaluate(source, displayHost, currentUrl) {
+      const meta = this.extractUserScriptMetadata(source);
+      const coverage = [
+        ...meta.match.map(pattern => ({ type: "match", pattern })),
+        ...meta.include.map(pattern => ({ type: "include", pattern }))
+      ];
+      const matching = coverage.filter(entry => this.patternCoversUrl(entry.pattern, currentUrl, entry.type));
+      const excluded = meta.exclude.filter(pattern => this.patternCoversUrl(pattern, currentUrl, "exclude"));
+
+      if (!coverage.length) {
+        return { status: "warn", title: "No match metadata found", detail: "This script has no @match or @include lines in the metadata block.", patterns: [] };
+      }
+      if (excluded.length) {
+        return { status: "bad", title: `Excluded on ${displayHost}`, detail: "An @exclude pattern matches this page.", patterns: excluded.slice(0, 3) };
+      }
+      if (matching.length) {
+        return { status: "good", title: `Covers ${displayHost}`, detail: "At least one @match or @include entry applies to this page.", patterns: matching.map(entry => entry.pattern).slice(0, 3) };
+      }
+      return { status: "bad", title: `No match for ${displayHost}`, detail: "The metadata block did not include a pattern that applies to this page.", patterns: coverage.map(entry => entry.pattern).slice(0, 3) };
+    },
+
+    extractUserScriptMetadata(source) {
+      const meta = { match: [], include: [], exclude: [] };
+      const lines = String(source || "").split(/\r?\n/).slice(0, 400);
+      for (const line of lines) {
+        if (/==\/UserScript==/.test(line)) break;
+        const found = line.match(/^\s*\/\/\s*@(match|include|exclude)\s+(.+?)\s*$/i);
+        if (found) meta[found[1].toLowerCase()].push(found[2].trim());
+      }
+      return meta;
+    },
+
+    patternCoversUrl(pattern, currentUrl, type = "include") {
+      const trimmed = String(pattern || "").trim();
+      if (!trimmed) return false;
+      if (trimmed === "<all_urls>") return true;
+
+      const url = this.parseUrl(currentUrl);
+      if (!url) return false;
+      if (type === "match") return this.matchBrowserPattern(trimmed, url);
+      return this.matchIncludePattern(trimmed, url);
+    },
+
+    parseUrl(currentUrl) {
+      try { return new URL(currentUrl); }
+      catch { return null; }
+    },
+
+    matchBrowserPattern(pattern, url) {
+      const found = String(pattern || "").match(/^(\*|https?|file|ftp):\/\/([^/]*)(\/.*)?$/i);
+      if (!found) return false;
+
+      const [, rawScheme, rawHost, rawPath] = found;
+      const scheme = rawScheme.toLowerCase();
+      const urlScheme = url.protocol.replace(/:$/, "").toLowerCase();
+      if (scheme === "*" ? !["http", "https"].includes(urlScheme) : scheme !== urlScheme) return false;
+      if (urlScheme !== "file" && !this.hostMatchesPattern(url.hostname, rawHost)) return false;
+      return this.wildcardMatches(rawPath || "/", this.urlPath(url));
+    },
+
+    matchIncludePattern(pattern, url) {
+      if (/^\/.+\/[a-z]*$/i.test(pattern)) {
+        const lastSlash = pattern.lastIndexOf("/");
+        try { return new RegExp(pattern.slice(1, lastSlash), pattern.slice(lastSlash + 1)).test(url.href); }
+        catch { return false; }
+      }
+      return this.wildcardMatches(pattern, url.href);
+    },
+
+    hostMatchesPattern(host, pattern) {
+      const current = String(host || "").toLowerCase();
+      const candidate = String(pattern || "").toLowerCase();
+      if (candidate === "*" || candidate === current) return true;
+      if (candidate.startsWith("*.")) {
+        const root = candidate.slice(2);
+        return current === root || current.endsWith(`.${root}`);
+      }
+      if (candidate.startsWith("*")) return current.endsWith(candidate.slice(1));
+      return false;
+    },
+
+    wildcardMatches(pattern, value) {
+      const regex = "^" + String(pattern || "").split("*").map(part => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$";
+      try { return new RegExp(regex, "i").test(String(value || "")); }
+      catch { return false; }
+    },
+
+    urlPath(url) {
+      return `${url.pathname || "/"}${url.search || ""}${url.hash || ""}`;
+    }
+  };
+
+  if (typeof window !== "undefined" && window.__SF_TEST_HOOKS__) {
+    window.__SF_TEST_HOOKS__.MatchCoverage = MatchCoverage;
   }
 
   // ── Settings Service ────────────────────────────────────────────────
@@ -1452,16 +1551,17 @@
 .sf-script-sub svg { width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px; }
 .sf-dot { opacity: 0.3; font-size: 8px; }
 
-.sf-install-btn {
+.sf-script-actions { flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
+.sf-install-btn, .sf-preview-btn {
   flex-shrink: 0; display: flex; align-items: center; gap: 4px;
   padding: 6px 12px; border-radius: 8px; border: none;
   background: ${THEME.green}22; color: ${THEME.green};
   font: 700 11px/1 inherit; cursor: pointer;
   transition: all 0.2s ease; white-space: nowrap;
 }
-.sf-install-btn:hover { background: ${THEME.green}44; transform: scale(1.04); }
-.sf-install-btn:active { transform: scale(0.96); }
-.sf-install-btn svg { width: 14px; height: 14px; }
+.sf-install-btn:hover, .sf-preview-btn:hover { background: ${THEME.green}44; transform: scale(1.04); }
+.sf-install-btn:active, .sf-preview-btn:active { transform: scale(0.96); }
+.sf-install-btn svg, .sf-preview-btn svg { width: 14px; height: 14px; }
 .sf-item.sleazyfork .sf-install-btn { background: ${THEME.purple}22; color: ${THEME.purple}; }
 .sf-item.sleazyfork .sf-install-btn:hover { background: ${THEME.purple}44; }
 .sf-item.openuserjs .sf-install-btn { background: ${THEME.openuserjs}22; color: ${THEME.openuserjs}; }
@@ -1476,6 +1576,19 @@
 .sf-item.githubgist .sf-install-btn:hover { background: ${THEME.githubgist}44; }
 .sf-item.github .sf-install-btn { background: ${THEME.github}22; color: ${THEME.github}; }
 .sf-item.github .sf-install-btn:hover { background: ${THEME.github}44; }
+.sf-preview-btn { background: ${THEME.surface1}; color: ${THEME.subtext1}; border: 1px solid ${THEME.glassBorder}; }
+.sf-preview-btn:hover { background: ${THEME.surface2}; color: ${THEME.text}; }
+.sf-match-preview {
+  margin-top: 10px; padding: 10px 12px; border-radius: 8px;
+  background: ${THEME.surface0}; border: 1px solid ${THEME.glassBorder};
+  color: ${THEME.subtext1}; font: 500 11px/1.45 inherit;
+}
+.sf-match-preview.hidden { display: none; }
+.sf-match-preview.good { border-color: ${THEME.green}33; color: ${THEME.green}; }
+.sf-match-preview.warn { border-color: ${THEME.yellow}33; color: ${THEME.yellow}; }
+.sf-match-preview.bad { border-color: ${THEME.red}33; color: ${THEME.red}; }
+.sf-match-preview-title { font-weight: 800; margin-bottom: 4px; color: ${THEME.text}; }
+.sf-match-preview code { color: ${THEME.subtext1}; word-break: break-all; }
 
 .sf-script-desc {
   color: ${THEME.subtext0}; font: 400 12px/1.5 inherit;
@@ -2051,6 +2164,69 @@
       });
     }
 
+    async _toggleMatchPreview(script, pane, button) {
+      if (!pane.classList.contains("hidden")) {
+        pane.classList.add("hidden");
+        return;
+      }
+
+      pane.className = "sf-match-preview";
+      _safeHTML(pane, `<div class="sf-match-preview-title">Checking match coverage...</div>`);
+      button.disabled = true;
+
+      try {
+        if (!script._matchPreview) {
+          const source = await this._fetchPreviewSource(script.code_url);
+          script._matchPreview = this._parseMatchCoverage(source, HostService.getCurrentHost(), window.location.href);
+        }
+        const preview = script._matchPreview;
+        pane.className = `sf-match-preview ${preview.status}`;
+        _safeHTML(pane, `
+          <div class="sf-match-preview-title">${escapeHtml(preview.title)}</div>
+          <div>${escapeHtml(preview.detail)}</div>
+          ${preview.patterns.length ? `<div>Metadata: ${preview.patterns.map(p => `<code>${escapeHtml(p)}</code>`).join(", ")}</div>` : ""}
+        `);
+      } catch(err) {
+        pane.className = "sf-match-preview warn";
+        _safeHTML(pane, `
+          <div class="sf-match-preview-title">Coverage unavailable</div>
+          <div>${escapeHtml(err?.message || "Could not load script metadata.")}</div>
+        `);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    _fetchPreviewSource(url) {
+      return new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+          method: "GET", url,
+          headers: { Accept: "text/plain,*/*" },
+          onload: r => {
+            if (r.status >= 200 && r.status < 300) resolve(r.responseText || "");
+            else reject(new Error(`Preview HTTP ${r.status}`));
+          },
+          onerror: reject
+        });
+      });
+    }
+
+    _parseMatchCoverage(source, host, currentUrl) {
+      return MatchCoverage.evaluate(source, host, currentUrl);
+    }
+
+    _extractUserScriptMetadata(source) {
+      return MatchCoverage.extractUserScriptMetadata(source);
+    }
+
+    _patternCoversHost(pattern, host, currentUrl) {
+      return MatchCoverage.patternCoversUrl(pattern, currentUrl, String(pattern || "").includes("://") ? "match" : "include");
+    }
+
+    _hostMatchesPattern(host, pattern) {
+      return MatchCoverage.hostMatchesPattern(host, pattern);
+    }
+
     _createScriptItem(script, svcClass, index) {
       const item = document.createElement("div");
       item.className = `sf-item ${svcClass}`;
@@ -2141,6 +2317,8 @@
       } else {
         actionBtn = "";
       }
+      const previewBtn = installUrl ? `<button class="sf-preview-btn" data-url="${escapeHtml(installUrl)}" title="Preview match coverage">${getIcon('search')} Coverage</button>` : "";
+      const actionsHtml = actionBtn || previewBtn ? `<div class="sf-script-actions">${actionBtn}${previewBtn}</div>` : "";
 
       _safeHTML(item, `
         <div class="sf-script-top">
@@ -2154,10 +2332,11 @@
               ${script.license ? `<span title="License">${getIcon('scales')} ${escapeHtml(script.license)}</span>` : ""}
             </div>
           </div>
-          ${actionBtn}
+          ${actionsHtml}
         </div>
         <div class="sf-script-desc" title="${escapeHtml(script.description || '')}">${escapeHtml(script.description || "No description")}</div>
         <div class="sf-script-meta">${metaHtml}</div>
+        <div class="sf-match-preview hidden"></div>
       `);
 
       // Action button handler
@@ -2166,6 +2345,14 @@
         actionEl.addEventListener("click", (e) => {
           e.stopPropagation();
           GM_openInTab(actionEl.dataset.url, { active: true });
+        });
+      }
+      const previewEl = item.querySelector(".sf-preview-btn");
+      const previewPane = item.querySelector(".sf-match-preview");
+      if (previewEl && previewPane) {
+        previewEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this._toggleMatchPreview(script, previewPane, previewEl);
         });
       }
 

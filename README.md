@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.7.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.8.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-WTFPL-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -72,6 +72,7 @@ Click your userscript manager icon on any website and pick a source to search:
 | **One-Click Install** | Install scripts directly from registries and `.user.js` Gists without leaving the page |
 | **Live Search Filter** | Real-time filtering within results with match count (e.g., `12/47`) |
 | **Result Filters** | Narrow results by recent update window, normalized minimum rating, and English-looking names/descriptions |
+| **Match Coverage Preview** | Fetches raw userscript metadata and compares `@match` / `@include` / `@exclude` rules against the current page, including scheme, host, path, wildcard, and exclude precedence |
 | **Smart Sorting** | Sort by daily installs, total installs, ratings, fan score, author reputation, last update, or creation date |
 | **Curated Catalogs** | Searches Awesome Userscripts and Tampermonkey's Userscript.Zone handoff for domain-matched recommendations |
 | **GitHub Integration** | Searches repos and Gists matching `{domain} userscript/tampermonkey/greasemonkey`, shows stars and forks |
