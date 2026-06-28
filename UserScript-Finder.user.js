@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.13.0
+// @version      1.14.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -308,7 +308,16 @@
     freshCache(service, cacheKey, settings) {
       const cacheDuration = settings.get("cacheDuration");
       const cached = service.cache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < cacheDuration) return { cached, data: cached.data };
+      if (cached && Date.now() - cached.timestamp < cacheDuration) return {
+        cached,
+        data: this.withHealth(cached.data, {
+          type: "cached",
+          title: `${this.label(service)} cache hit`,
+          detail: `Using cached results from ${this.ageLabel(cached.timestamp)}.`,
+          checkedAt: Date.now(),
+          cachedAt: cached.timestamp
+        })
+      };
       return { cached, data: null };
     },
 
@@ -319,15 +328,24 @@
       if (cached) return this.withStatus(cached.data, {
         type: "stale",
         title: `${this.label(service)} is backing off`,
-        detail: `Showing cached results from ${this.ageLabel(cached.timestamp)}. Retry opens in ${seconds}s.`
+        detail: `Showing cached results from ${this.ageLabel(cached.timestamp)}. Retry opens in ${seconds}s.`,
+        checkedAt: Date.now(),
+        cachedAt: cached.timestamp
       });
       throw this.error(this.label(service), `Waiting ${seconds}s before retrying after a source failure.`, "backoff");
     },
 
     saveCache(service, cacheKey, data) {
       const clean = Array.isArray(data) ? data.slice() : data;
-      service.cache.set(cacheKey, { data: clean, timestamp: Date.now() });
-      return data;
+      const timestamp = Date.now();
+      service.cache.set(cacheKey, { data: clean, timestamp });
+      return this.withHealth(data, {
+        type: "ok",
+        title: `${this.label(service)} loaded`,
+        detail: "Fresh source results loaded.",
+        checkedAt: timestamp,
+        cachedAt: timestamp
+      });
     },
 
     staleOrThrow(service, cacheKey, cached, err) {
@@ -335,7 +353,9 @@
       if (cached) return this.withStatus(cached.data, {
         type: "stale",
         title: `${this.label(service)} unavailable`,
-        detail: `Showing cached results from ${this.ageLabel(cached.timestamp)} because ${this.cleanMessage(err)}.`
+        detail: `Showing cached results from ${this.ageLabel(cached.timestamp)} because ${this.cleanMessage(err)}.`,
+        checkedAt: Date.now(),
+        cachedAt: cached.timestamp
       });
       throw err;
     },
@@ -350,6 +370,14 @@
       if (!Array.isArray(data)) return data;
       const copy = data.slice();
       Object.defineProperty(copy, "_sfStatus", { value: status, enumerable: false });
+      Object.defineProperty(copy, "_sfHealth", { value: status, enumerable: false });
+      return copy;
+    },
+
+    withHealth(data, health) {
+      if (!Array.isArray(data)) return data;
+      const copy = data.slice();
+      Object.defineProperty(copy, "_sfHealth", { value: health, enumerable: false });
       return copy;
     },
 
@@ -1007,7 +1035,9 @@
       if (errors.length) return SourceRuntime.withStatus(saved, {
         type: "partial",
         title: "GitHub partially loaded",
-        detail: `${errors.length} search ${errors.length === 1 ? "query" : "queries"} failed; showing successful repository matches.`
+        detail: `${errors.length} search ${errors.length === 1 ? "query" : "queries"} failed; showing successful repository matches.`,
+        checkedAt: Date.now(),
+        cachedAt: Date.now()
       });
       return saved;
     }
@@ -1096,7 +1126,9 @@
       if (errors.length) return SourceRuntime.withStatus(saved, {
         type: "partial",
         title: "Catalogs partially loaded",
-        detail: `${errors.length} catalog ${errors.length === 1 ? "source" : "sources"} failed; showing the catalog results that loaded.`
+        detail: `${errors.length} catalog ${errors.length === 1 ? "source" : "sources"} failed; showing the catalog results that loaded.`,
+        checkedAt: Date.now(),
+        cachedAt: Date.now()
       });
       return saved;
     }
@@ -1290,7 +1322,9 @@
       if (errors.length) return SourceRuntime.withStatus(saved, {
         type: "partial",
         title: "GitHub Gists partially loaded",
-        detail: `${errors.length} gist search ${errors.length === 1 ? "query" : "queries"} failed; showing successful gist matches.`
+        detail: `${errors.length} gist search ${errors.length === 1 ? "query" : "queries"} failed; showing successful gist matches.`,
+        checkedAt: Date.now(),
+        cachedAt: Date.now()
       });
       return saved;
     }
@@ -1628,6 +1662,14 @@
   text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sf-tab:hover { background: ${THEME.surface1}; color: ${THEME.text}; }
+.sf-tab[data-health-label]:not([data-health-label=""]) { padding-right: 42px; }
+.sf-tab[data-health-label]:not([data-health-label=""])::after {
+  content: attr(data-health-label); position: absolute; top: 3px; right: 5px;
+  font: 800 8px/1 inherit; letter-spacing: 0; opacity: 0.9;
+}
+.sf-tab.health-ok::after { color: ${THEME.green}; }
+.sf-tab.health-cached::after, .sf-tab.health-stale::after, .sf-tab.health-partial::after { color: ${THEME.yellow}; }
+.sf-tab.health-rate-limited::after, .sf-tab.health-failed::after { color: ${THEME.red}; }
 .sf-tab.active {
   background: linear-gradient(135deg, ${THEME.greenDim}, ${THEME.green}33);
   color: ${THEME.green}; border-color: ${THEME.green}33;
@@ -1881,7 +1923,7 @@
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   font: 600 11px/1 inherit;
 }
-.sf-footer-text { color: ${THEME.overlay}; }
+.sf-footer-text { color: ${THEME.overlay}; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .sf-footer a { color: ${THEME.green}; text-decoration: none; font-weight: 700; }
 .sf-footer a:hover { text-decoration: underline; }
 .sf-footer a.sleazyfork { color: ${THEME.purple}; }
@@ -1891,6 +1933,19 @@
 .sf-footer a.catalogs { color: ${THEME.catalogs}; }
 .sf-footer a.githubgist { color: ${THEME.githubgist}; }
 .sf-footer a.github { color: ${THEME.github}; }
+.sf-health-pill {
+  display: inline-flex; align-items: center; padding: 3px 7px; border-radius: 6px;
+  background: ${THEME.surface1}; color: ${THEME.subtext1}; border: 1px solid ${THEME.glassBorder};
+  font: 800 10px/1 inherit; white-space: nowrap;
+}
+.sf-health-pill.ok { color: ${THEME.green}; border-color: ${THEME.green}33; }
+.sf-health-pill.cached, .sf-health-pill.stale, .sf-health-pill.partial { color: ${THEME.yellow}; border-color: ${THEME.yellow}33; }
+.sf-health-pill.rate-limited, .sf-health-pill.failed { color: ${THEME.red}; border-color: ${THEME.red}33; }
+.sf-diagnostics-btn {
+  border: 1px solid ${THEME.glassBorder}; background: ${THEME.surface1}; color: ${THEME.subtext1};
+  border-radius: 7px; padding: 5px 9px; font: 800 10px/1 inherit; cursor: pointer; flex-shrink: 0;
+}
+.sf-diagnostics-btn:hover { color: ${THEME.text}; background: ${THEME.surface2}; }
 
 /* Settings panel */
 .sf-settings {
@@ -1959,6 +2014,7 @@
       this.isLoading = false;
       this.allScripts = [];
       this.sourceStatus = null;
+      this.sourceHealth = {};
       this.searchQuery = "";
       this.settingsOpen = false;
       this.previousFocus = null;
@@ -2090,7 +2146,8 @@
           </div>
         </div>
         <div class="sf-footer">
-          <div class="sf-footer-text">Data from <a href="https://greasyfork.org" target="_blank">GreasyFork</a></div>
+          <div class="sf-footer-text">Data from <a href="https://greasyfork.org" target="_blank">GreasyFork</a><span class="sf-health-pill">Not checked</span></div>
+          <button class="sf-diagnostics-btn" type="button" title="Copy source diagnostics" aria-label="Copy source diagnostics">Diagnostics</button>
         </div>
       `);
       this.shadow.appendChild(this.modal);
@@ -2113,6 +2170,7 @@
       // Modal buttons
       this.modal.querySelector(".sf-btn-close").addEventListener("click", () => this._close());
       this.modal.querySelector(".sf-btn-settings").addEventListener("click", () => this._toggleSettings());
+      this.modal.querySelector(".sf-diagnostics-btn").addEventListener("click", () => this._copyDiagnostics());
 
       // Tabs
       this.modal.querySelectorAll(".sf-tab").forEach(tab => {
@@ -2301,6 +2359,7 @@
         footerLink.textContent = labels[svc];
         footerLink.href = urls[svc];
       }
+      this._updateHealthUi();
     }
 
     _setResultCount(count) {
@@ -2333,6 +2392,89 @@
       return `${label} unavailable`;
     }
 
+    _recordSourceHealth(serviceName, health) {
+      const normalized = {
+        type: health?.type || "ok",
+        title: health?.title || "Source checked",
+        detail: health?.detail || "",
+        checkedAt: health?.checkedAt || Date.now(),
+        cachedAt: health?.cachedAt || null
+      };
+      if (normalized.type === "rate-limit") normalized.type = "rate-limited";
+      this.sourceHealth[serviceName] = normalized;
+      this._updateHealthUi();
+    }
+
+    _healthLabel(health) {
+      const labels = {
+        ok: "OK",
+        cached: "CACHE",
+        stale: "STALE",
+        partial: "PARTIAL",
+        "rate-limited": "RATE",
+        failed: "FAIL"
+      };
+      return labels[health?.type] || "CHECK";
+    }
+
+    _healthClass(health) {
+      return ["ok", "cached", "stale", "partial", "rate-limited", "failed"].includes(health?.type) ? health.type : "failed";
+    }
+
+    _healthTitle(serviceName, health) {
+      if (!health) return "Source has not been checked yet.";
+      const checked = new Date(health.checkedAt).toISOString();
+      const cacheAge = health.cachedAt ? SourceRuntime.ageLabel(health.cachedAt) : "none";
+      return `${SourceRuntime.sourceLabels[serviceName] || serviceName}: ${this._healthLabel(health)}. Last checked ${checked}. Cache age ${cacheAge}. ${health.detail || ""}`.trim();
+    }
+
+    _updateHealthUi() {
+      if (!this.modal) return;
+      this.modal.querySelectorAll(".sf-tab").forEach(tab => {
+        const health = this.sourceHealth[tab.dataset.service];
+        ["ok", "cached", "stale", "partial", "rate-limited", "failed"].forEach(cls => tab.classList.remove(`health-${cls}`));
+        tab.dataset.healthLabel = health ? this._healthLabel(health) : "";
+        if (health) tab.classList.add(`health-${this._healthClass(health)}`);
+        tab.title = this._healthTitle(tab.dataset.service, health);
+      });
+
+      const health = this.sourceHealth[this.currentService];
+      const pill = this.modal.querySelector(".sf-health-pill");
+      if (pill) {
+        const cls = health ? this._healthClass(health) : "";
+        pill.className = `sf-health-pill ${cls}`;
+        pill.textContent = health ? `${this._healthLabel(health)} ${SourceRuntime.ageLabel(health.checkedAt)}` : "Not checked";
+        pill.title = this._healthTitle(this.currentService, health);
+      }
+    }
+
+    _diagnosticString() {
+      const health = this.sourceHealth[this.currentService] || { type: "unchecked", checkedAt: Date.now() };
+      const rootHost = HostService.extractRootDomain(this.currentDomain || HostService.getCurrentHost());
+      const cacheAge = health.cachedAt ? SourceRuntime.ageLabel(health.cachedAt) : "none";
+      return [
+        "UserScript Finder source diagnostic",
+        `source=${this.currentService}`,
+        `host=${rootHost}`,
+        `status=${health.type}`,
+        `checkedAt=${new Date(health.checkedAt).toISOString()}`,
+        `cacheAge=${cacheAge}`,
+        `resultCount=${Array.isArray(this.allScripts) ? this.allScripts.length : 0}`
+      ].join("\n");
+    }
+
+    async _copyDiagnostics() {
+      const diagnostic = this._diagnosticString();
+      try {
+        if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+        await navigator.clipboard.writeText(diagnostic);
+        this.toast.show("Diagnostics copied");
+      } catch(err) {
+        console.info("[Script Finder diagnostics]", diagnostic);
+        this.toast.show("Diagnostics written to console");
+      }
+    }
+
     // ── Data ────────────────────────────────────────────────────────
     async _loadScripts() {
       if (this.isLoading) return;
@@ -2350,10 +2492,23 @@
         this.currentDomain = host;
         this.allScripts = await svc.searchScriptsByHost(this.currentDomain, this.settings);
         this.sourceStatus = this.allScripts?._sfStatus || null;
+        this._recordSourceHealth(this.currentService, this.allScripts?._sfHealth || {
+          type: "ok",
+          title: `${svcLabel} loaded`,
+          detail: "Fresh source results loaded.",
+          checkedAt: Date.now()
+        });
         this._setResultCount(this.allScripts.length);
         this._displayScripts();
       } catch(err) {
         this.sourceStatus = null;
+        this.allScripts = [];
+        this._recordSourceHealth(this.currentService, {
+          type: err?.kind === "rate-limit" ? "rate-limited" : "failed",
+          title: this._sourceErrorTitle(err, svcLabel),
+          detail: err?.message || "Unknown error",
+          checkedAt: Date.now()
+        });
         this._setResultCount(0);
         const directUrl = svc.getDirectSearchUrl(this.currentDomain);
         _safeHTML(this.content, `

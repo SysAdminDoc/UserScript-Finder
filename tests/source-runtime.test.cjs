@@ -53,7 +53,9 @@ service.cache.set("fresh-key", { data: fresh, timestamp: now });
 service.cache.set("stale-key", { data: stale, timestamp: now - 120000 });
 
 assert.equal(runtime.label(service), "GitHub");
-assert.equal(runtime.freshCache(service, "fresh-key", { get: () => 60000 }).data, fresh);
+const freshHit = runtime.freshCache(service, "fresh-key", { get: () => 60000 }).data;
+assert.equal(freshHit[0].name, "fresh");
+assert.equal(freshHit._sfHealth.type, "cached");
 
 const staleHit = runtime.freshCache(service, "stale-key", { get: () => 60000 });
 assert.equal(staleHit.data, null);
@@ -66,6 +68,7 @@ assert.equal(rateLimit.retryMs, 60000);
 const staleFallback = runtime.staleOrThrow(service, "stale-key", staleHit.cached, rateLimit);
 assert.equal(staleFallback[0].name, "stale");
 assert.equal(staleFallback._sfStatus.type, "stale");
+assert.equal(staleFallback._sfHealth.type, "stale");
 assert.match(staleFallback._sfStatus.detail, /rate limited/);
 
 const backingOff = runtime.backoffFallback(service, "stale-key", staleHit.cached);
