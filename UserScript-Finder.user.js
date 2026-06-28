@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.8.1
+// @version      1.9.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -288,6 +288,133 @@
     window.__SF_TEST_HOOKS__.MatchCoverage = MatchCoverage;
   }
 
+  const SourceRuntime = {
+    timeoutMs: 12000,
+    sourceLabels: {
+      greasyfork: "GreasyFork",
+      sleazyfork: "SleazyFork",
+      openuserjs: "OpenUserJS",
+      chromewebstore: "Chrome Web Store",
+      mozillaaddons: "Mozilla Add-ons",
+      catalogs: "Script Catalogs",
+      githubgist: "GitHub Gists",
+      github: "GitHub"
+    },
+
+    label(service) {
+      return this.sourceLabels[service?.serviceName] || service?.serviceName || "Source";
+    },
+
+    freshCache(service, cacheKey, settings) {
+      const cacheDuration = settings.get("cacheDuration");
+      const cached = service.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < cacheDuration) return { cached, data: cached.data };
+      return { cached, data: null };
+    },
+
+    backoffFallback(service, cacheKey, cached) {
+      const until = service._sfBackoff?.get(cacheKey) || 0;
+      if (until <= Date.now()) return null;
+      const seconds = Math.max(1, Math.ceil((until - Date.now()) / 1000));
+      if (cached) return this.withStatus(cached.data, {
+        type: "stale",
+        title: `${this.label(service)} is backing off`,
+        detail: `Showing cached results from ${this.ageLabel(cached.timestamp)}. Retry opens in ${seconds}s.`
+      });
+      throw this.error(this.label(service), `Waiting ${seconds}s before retrying after a source failure.`, "backoff");
+    },
+
+    saveCache(service, cacheKey, data) {
+      const clean = Array.isArray(data) ? data.slice() : data;
+      service.cache.set(cacheKey, { data: clean, timestamp: Date.now() });
+      return data;
+    },
+
+    staleOrThrow(service, cacheKey, cached, err) {
+      this.noteBackoff(service, cacheKey, err);
+      if (cached) return this.withStatus(cached.data, {
+        type: "stale",
+        title: `${this.label(service)} unavailable`,
+        detail: `Showing cached results from ${this.ageLabel(cached.timestamp)} because ${this.cleanMessage(err)}.`
+      });
+      throw err;
+    },
+
+    noteBackoff(service, cacheKey, err) {
+      const retryMs = err?.retryMs || (err?.kind === "rate-limit" ? 60000 : err?.kind === "timeout" ? 20000 : 10000);
+      if (!service._sfBackoff) service._sfBackoff = new Map();
+      service._sfBackoff.set(cacheKey, Date.now() + retryMs);
+    },
+
+    withStatus(data, status) {
+      if (!Array.isArray(data)) return data;
+      const copy = data.slice();
+      Object.defineProperty(copy, "_sfStatus", { value: status, enumerable: false });
+      return copy;
+    },
+
+    ageLabel(timestamp) {
+      const seconds = Math.max(1, Math.floor((Date.now() - timestamp) / 1000));
+      if (seconds < 60) return `${seconds}s ago`;
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      return `${hours}h ago`;
+    },
+
+    cleanMessage(err) {
+      return String(err?.message || "the source request failed").replace(/\.$/, "");
+    },
+
+    error(source, message, kind = "network", retryMs = null) {
+      const err = new Error(`${source}: ${message}`);
+      err.kind = kind;
+      if (retryMs) err.retryMs = retryMs;
+      return err;
+    },
+
+    httpError(source, status) {
+      if (status === 403 || status === 429) return this.error(source, `rate limited (HTTP ${status})`, "rate-limit", 60000);
+      if (status >= 500) return this.error(source, `temporary server error (HTTP ${status})`, "server", 20000);
+      return this.error(source, `HTTP ${status}`, "http", 10000);
+    },
+
+    requestText(url, { source, headers = {}, notFound = "" } = {}) {
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        const done = (fn, value) => {
+          if (settled) return;
+          settled = true;
+          fn(value);
+        };
+        GM_xmlhttpRequest({
+          method: "GET",
+          url,
+          headers,
+          timeout: this.timeoutMs,
+          onload: r => {
+            if (r.status >= 200 && r.status < 300) done(resolve, r.responseText || "");
+            else if (r.status === 404) done(resolve, notFound);
+            else done(reject, this.httpError(source, r.status));
+          },
+          onerror: () => done(reject, this.error(source, "network request failed", "network", 10000)),
+          ontimeout: () => done(reject, this.error(source, `timed out after ${Math.round(this.timeoutMs / 1000)}s`, "timeout", 20000))
+        });
+      });
+    },
+
+    async requestJson(url, options = {}) {
+      const text = await this.requestText(url, options);
+      if (typeof text !== "string") return text;
+      try { return JSON.parse(text || "null"); }
+      catch(e) { throw this.error(options.source, `invalid JSON (${e.message})`, "parse", 10000); }
+    }
+  };
+
+  if (typeof window !== "undefined" && window.__SF_TEST_HOOKS__) {
+    window.__SF_TEST_HOOKS__.SourceRuntime = SourceRuntime;
+  }
+
   // ── Settings Service ────────────────────────────────────────────────
   class SettingsService {
     constructor() { this.settings = this.loadSettings(); }
@@ -328,33 +455,31 @@
 
     async _searchWithDomain(domain, settings) {
       const cacheKey = `${this.serviceName}_${domain}`;
-      const cacheDuration = settings.get("cacheDuration");
-      const cached = this.cache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < cacheDuration) return cached.data;
+      const { cached, data } = SourceRuntime.freshCache(this, cacheKey, settings);
+      if (data) return data;
+      const backoff = SourceRuntime.backoffFallback(this, cacheKey, cached);
+      if (backoff) return backoff;
 
       let scripts = [];
       try {
         scripts = await this._fetchBySite(domain);
-      } catch {
-        try { scripts = await this._fetchSearch(domain); } catch { scripts = []; }
+      } catch(err) {
+        try {
+          scripts = await this._fetchSearch(domain);
+        } catch(searchErr) {
+          return SourceRuntime.staleOrThrow(this, cacheKey, cached, searchErr || err);
+        }
       }
 
       const filtered = this._filter(scripts, domain);
-      this.cache.set(cacheKey, { data: filtered, timestamp: Date.now() });
-      return filtered;
+      return SourceRuntime.saveCache(this, cacheKey, filtered);
     }
 
     _fetch(url) {
-      return new Promise((resolve, reject) => {
-        GM_xmlhttpRequest({
-          method: "GET", url, headers: { Accept: "application/json" },
-          onload: r => {
-            if (r.status === 200) { try { resolve(JSON.parse(r.responseText)); } catch(e) { reject(e); } }
-            else if (r.status === 404) resolve([]);
-            else reject(new Error(`HTTP ${r.status}`));
-          },
-          onerror: reject
-        });
+      return SourceRuntime.requestJson(url, {
+        source: SourceRuntime.label(this),
+        headers: { Accept: "application/json" },
+        notFound: "[]"
       });
     }
 
@@ -396,21 +521,21 @@
 
     async _searchWithDomain(domain, settings) {
       const cacheKey = `openuserjs_${domain}`;
-      const cacheDuration = settings.get("cacheDuration");
-      const cached = this.cache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < cacheDuration) return cached.data;
+      const { cached, data } = SourceRuntime.freshCache(this, cacheKey, settings);
+      if (data) return data;
+      const backoff = SourceRuntime.backoffFallback(this, cacheKey, cached);
+      if (backoff) return backoff;
 
       let scripts = [];
       try {
         const html = await this._fetchSearch(domain);
         scripts = this._parseSearchResults(html);
-      } catch {
-        scripts = [];
+      } catch(err) {
+        return SourceRuntime.staleOrThrow(this, cacheKey, cached, err);
       }
 
       const filtered = this._filter(scripts, domain);
-      this.cache.set(cacheKey, { data: filtered, timestamp: Date.now() });
-      return filtered;
+      return SourceRuntime.saveCache(this, cacheKey, filtered);
     }
 
     _fetchSearch(domain) {
@@ -418,17 +543,10 @@
     }
 
     _fetch(url) {
-      return new Promise((resolve, reject) => {
-        GM_xmlhttpRequest({
-          method: "GET", url,
-          headers: { Accept: "text/html,application/xhtml+xml" },
-          onload: r => {
-            if (r.status === 200) resolve(r.responseText || "");
-            else if (r.status === 404) resolve("");
-            else reject(new Error(`OpenUserJS ${r.status}`));
-          },
-          onerror: reject
-        });
+      return SourceRuntime.requestText(url, {
+        source: SourceRuntime.label(this),
+        headers: { Accept: "text/html,application/xhtml+xml" },
+        notFound: ""
       });
     }
 
@@ -522,20 +640,20 @@
 
     async _searchWithDomain(domain, settings) {
       const cacheKey = `chromewebstore_${domain}`;
-      const cacheDuration = settings.get("cacheDuration");
-      const cached = this.cache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < cacheDuration) return cached.data;
+      const { cached, data } = SourceRuntime.freshCache(this, cacheKey, settings);
+      if (data) return data;
+      const backoff = SourceRuntime.backoffFallback(this, cacheKey, cached);
+      if (backoff) return backoff;
 
       let extensions = [];
       try {
         const html = await this._fetchSearch(domain);
         extensions = this._parseSearchResults(html);
-      } catch {
-        extensions = [];
+      } catch(err) {
+        return SourceRuntime.staleOrThrow(this, cacheKey, cached, err);
       }
 
-      this.cache.set(cacheKey, { data: extensions, timestamp: Date.now() });
-      return extensions;
+      return SourceRuntime.saveCache(this, cacheKey, extensions);
     }
 
     _fetchSearch(domain) {
@@ -543,17 +661,10 @@
     }
 
     _fetch(url) {
-      return new Promise((resolve, reject) => {
-        GM_xmlhttpRequest({
-          method: "GET", url,
-          headers: { Accept: "text/html,application/xhtml+xml" },
-          onload: r => {
-            if (r.status === 200) resolve(r.responseText || "");
-            else if (r.status === 404) resolve("");
-            else reject(new Error(`Chrome Web Store ${r.status}`));
-          },
-          onerror: reject
-        });
+      return SourceRuntime.requestText(url, {
+        source: SourceRuntime.label(this),
+        headers: { Accept: "text/html,application/xhtml+xml" },
+        notFound: ""
       });
     }
 
@@ -680,20 +791,20 @@
 
     async _searchWithDomain(domain, settings) {
       const cacheKey = `mozillaaddons_${domain}`;
-      const cacheDuration = settings.get("cacheDuration");
-      const cached = this.cache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < cacheDuration) return cached.data;
+      const { cached, data } = SourceRuntime.freshCache(this, cacheKey, settings);
+      if (data) return data;
+      const backoff = SourceRuntime.backoffFallback(this, cacheKey, cached);
+      if (backoff) return backoff;
 
       let extensions = [];
       try {
         const data = await this._fetchSearch(domain);
         extensions = (data?.results || []).map(addon => this._normalize(addon)).filter(Boolean).slice(0, 25);
-      } catch {
-        extensions = [];
+      } catch(err) {
+        return SourceRuntime.staleOrThrow(this, cacheKey, cached, err);
       }
 
-      this.cache.set(cacheKey, { data: extensions, timestamp: Date.now() });
-      return extensions;
+      return SourceRuntime.saveCache(this, cacheKey, extensions);
     }
 
     _fetchSearch(domain) {
@@ -701,17 +812,10 @@
     }
 
     _fetch(url) {
-      return new Promise((resolve, reject) => {
-        GM_xmlhttpRequest({
-          method: "GET", url,
-          headers: { Accept: "application/json" },
-          onload: r => {
-            if (r.status === 200) { try { resolve(JSON.parse(r.responseText)); } catch(e) { reject(e); } }
-            else if (r.status === 404) resolve({ results: [] });
-            else reject(new Error(`Mozilla Add-ons ${r.status}`));
-          },
-          onerror: reject
-        });
+      return SourceRuntime.requestJson(url, {
+        source: SourceRuntime.label(this),
+        headers: { Accept: "application/json" },
+        notFound: "{\"results\":[]}"
       });
     }
 
@@ -776,52 +880,54 @@
 
     async searchScriptsByHost(host, settings) {
       const cacheKey = `github_${host}`;
-      const cacheDuration = settings.get("cacheDuration");
-      const cached = this.cache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < cacheDuration) return cached.data;
+      const { cached, data } = SourceRuntime.freshCache(this, cacheKey, settings);
+      if (data) return data;
+      const backoff = SourceRuntime.backoffFallback(this, cacheKey, cached);
+      if (backoff) return backoff;
 
       let results = [];
-      try {
-        // Search repos mentioning the domain + userscript keywords
-        const queries = [
-          `${host} userscript`,
-          `${host} tampermonkey`,
-          `${host} greasemonkey`
-        ];
-        const seen = new Set();
-        for (const q of queries) {
-          try {
-            const data = await this._fetchAPI(
-              `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}+language:javascript&sort=stars&per_page=20`
-            );
-            if (data?.items) {
-              for (const repo of data.items) {
-                if (!seen.has(repo.full_name)) {
-                  seen.add(repo.full_name);
-                  results.push(this._normalize(repo));
-                }
+      const errors = [];
+      const queries = [
+        `${host} userscript`,
+        `${host} tampermonkey`,
+        `${host} greasemonkey`
+      ];
+      const seen = new Set();
+      for (const q of queries) {
+        try {
+          const data = await this._fetchAPI(
+            `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}+language:javascript&sort=stars&per_page=20`
+          );
+          if (data?.items) {
+            for (const repo of data.items) {
+              if (!seen.has(repo.full_name)) {
+                seen.add(repo.full_name);
+                results.push(this._normalize(repo));
               }
             }
-          } catch { /* rate limit or network — continue */ }
+          }
+        } catch(err) {
+          errors.push(err);
+          if (err?.kind === "rate-limit") break;
         }
-      } catch { results = []; }
+      }
 
-      this.cache.set(cacheKey, { data: results, timestamp: Date.now() });
-      return results;
+      if (!results.length && errors.length) return SourceRuntime.staleOrThrow(this, cacheKey, cached, errors[0]);
+
+      const saved = SourceRuntime.saveCache(this, cacheKey, results);
+      if (errors.length) return SourceRuntime.withStatus(saved, {
+        type: "partial",
+        title: "GitHub partially loaded",
+        detail: `${errors.length} search ${errors.length === 1 ? "query" : "queries"} failed; showing successful repository matches.`
+      });
+      return saved;
     }
 
     _fetchAPI(url) {
-      return new Promise((resolve, reject) => {
-        GM_xmlhttpRequest({
-          method: "GET", url,
-          headers: { Accept: "application/vnd.github.v3+json", 'User-Agent': 'ScriptFinder/4' },
-          onload: r => {
-            if (r.status === 200) { try { resolve(JSON.parse(r.responseText)); } catch(e) { reject(e); } }
-            else if (r.status === 403) reject(new Error("GitHub rate limit — try again in a minute"))
-            else reject(new Error(`GitHub API ${r.status}`));
-          },
-          onerror: reject
-        });
+      return SourceRuntime.requestJson(url, {
+        source: SourceRuntime.label(this),
+        headers: { Accept: "application/vnd.github.v3+json", "User-Agent": "ScriptFinder/4" },
+        notFound: "{\"items\":[]}"
       });
     }
 
@@ -867,12 +973,14 @@
     async searchScriptsByHost(host, settings) {
       const domain = HostService.extractRootDomain(host);
       const cacheKey = `catalogs_${domain}`;
-      const cacheDuration = settings.get("cacheDuration");
-      const cached = this.cache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < cacheDuration) return cached.data;
+      const { cached, data } = SourceRuntime.freshCache(this, cacheKey, settings);
+      if (data) return data;
+      const backoff = SourceRuntime.backoffFallback(this, cacheKey, cached);
+      if (backoff) return backoff;
 
       const results = [];
       const seen = new Set();
+      const errors = [];
       try {
         const html = await this._fetchText(this.tampermonkeyUrl);
         for (const item of this._parseTampermonkeyCatalog(html, domain)) {
@@ -881,7 +989,7 @@
             results.push(item);
           }
         }
-      } catch { /* Keep Awesome Userscripts available if Tampermonkey blocks. */ }
+      } catch(err) { errors.push(err); }
 
       try {
         const markdown = await this._fetchText(this.awesomeUrl);
@@ -891,24 +999,24 @@
             results.push(item);
           }
         }
-      } catch { /* The handoff result above still gives users a catalog path. */ }
+      } catch(err) { errors.push(err); }
 
-      this.cache.set(cacheKey, { data: results, timestamp: Date.now() });
-      return results;
+      if (!results.length && errors.length) return SourceRuntime.staleOrThrow(this, cacheKey, cached, errors[0]);
+
+      const saved = SourceRuntime.saveCache(this, cacheKey, results);
+      if (errors.length) return SourceRuntime.withStatus(saved, {
+        type: "partial",
+        title: "Catalogs partially loaded",
+        detail: `${errors.length} catalog ${errors.length === 1 ? "source" : "sources"} failed; showing the catalog results that loaded.`
+      });
+      return saved;
     }
 
     _fetchText(url) {
-      return new Promise((resolve, reject) => {
-        GM_xmlhttpRequest({
-          method: "GET", url,
-          headers: { Accept: "text/plain,text/html,application/xhtml+xml" },
-          onload: r => {
-            if (r.status === 200) resolve(r.responseText || "");
-            else if (r.status === 404) resolve("");
-            else reject(new Error(`Catalog source ${r.status}`));
-          },
-          onerror: reject
-        });
+      return SourceRuntime.requestText(url, {
+        source: SourceRuntime.label(this),
+        headers: { Accept: "text/plain,text/html,application/xhtml+xml" },
+        notFound: ""
       });
     }
 
@@ -1057,9 +1165,10 @@
 
     async _searchWithDomain(domain, settings) {
       const cacheKey = `githubgist_${domain}`;
-      const cacheDuration = settings.get("cacheDuration");
-      const cached = this.cache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < cacheDuration) return cached.data;
+      const { cached, data } = SourceRuntime.freshCache(this, cacheKey, settings);
+      if (data) return data;
+      const backoff = SourceRuntime.backoffFallback(this, cacheKey, cached);
+      if (backoff) return backoff;
 
       const queries = [
         `${domain} userscript`,
@@ -1068,6 +1177,7 @@
       ];
       const results = [];
       const seen = new Set();
+      const errors = [];
 
       for (const query of queries) {
         try {
@@ -1079,11 +1189,21 @@
               results.push(script);
             }
           }
-        } catch { /* GitHub search can throttle or vary by query; keep partial results. */ }
+        } catch(err) {
+          errors.push(err);
+          if (err?.kind === "rate-limit") break;
+        }
       }
 
-      this.cache.set(cacheKey, { data: results, timestamp: Date.now() });
-      return results;
+      if (!results.length && errors.length) return SourceRuntime.staleOrThrow(this, cacheKey, cached, errors[0]);
+
+      const saved = SourceRuntime.saveCache(this, cacheKey, results);
+      if (errors.length) return SourceRuntime.withStatus(saved, {
+        type: "partial",
+        title: "GitHub Gists partially loaded",
+        detail: `${errors.length} gist search ${errors.length === 1 ? "query" : "queries"} failed; showing successful gist matches.`
+      });
+      return saved;
     }
 
     _fetchSearch(query) {
@@ -1091,17 +1211,10 @@
     }
 
     _fetch(url) {
-      return new Promise((resolve, reject) => {
-        GM_xmlhttpRequest({
-          method: "GET", url,
-          headers: { Accept: "text/html,application/xhtml+xml" },
-          onload: r => {
-            if (r.status === 200) resolve(r.responseText || "");
-            else if (r.status === 404) resolve("");
-            else reject(new Error(`GitHub Gists ${r.status}`));
-          },
-          onerror: reject
-        });
+      return SourceRuntime.requestText(url, {
+        source: SourceRuntime.label(this),
+        headers: { Accept: "text/html,application/xhtml+xml" },
+        notFound: ""
       });
     }
 
@@ -1308,7 +1421,7 @@
 
 /* ── MODAL ── */
 .sf-modal {
-  position: fixed; bottom: 14px; right: 14px; width: 500px;
+  position: fixed; bottom: 14px; right: 14px; width: min(500px, calc(100vw - 24px));
   max-height: min(84vh, 800px);
   background: ${THEME.base}; border-radius: 16px;
   border: 1px solid ${THEME.glassBorder};
@@ -1628,12 +1741,22 @@
 .sf-empty-title, .sf-error-title { font: 700 15px/1.3 inherit; color: ${THEME.text}; margin-bottom: 8px; }
 .sf-error-title { color: ${THEME.red}; }
 .sf-empty-text, .sf-error-text { color: ${THEME.subtext0}; font: 400 13px/1.5 inherit; margin-bottom: 18px; }
+.sf-source-notice {
+  margin: 12px 20px; padding: 12px 14px; border-radius: 10px;
+  background: ${THEME.surface0}; border: 1px solid ${THEME.glassBorder};
+  color: ${THEME.subtext1}; font: 500 12px/1.45 inherit;
+}
+.sf-source-notice.warn { border-color: ${THEME.yellow}44; color: ${THEME.yellow}; }
+.sf-source-notice.bad { border-color: ${THEME.red}44; color: ${THEME.red}; }
+.sf-source-notice-title { color: ${THEME.text}; font-weight: 800; margin-bottom: 4px; }
+.sf-source-notice a { color: inherit; font-weight: 800; text-decoration: underline; }
+.sf-error-actions { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
 .sf-action-btn {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 10px 18px; border-radius: 10px;
   background: linear-gradient(135deg, ${THEME.greenDim}, ${THEME.green}88);
   color: ${THEME.base}; font: 700 13px/1 inherit; border: none;
-  cursor: pointer; transition: all 0.2s ease;
+  cursor: pointer; transition: all 0.2s ease; text-decoration: none;
 }
 .sf-action-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
 .sf-action-btn.sleazyfork { background: linear-gradient(135deg, ${THEME.purpleDim}, ${THEME.purple}88); }
@@ -1728,6 +1851,7 @@
       this.isOpen = false;
       this.isLoading = false;
       this.allScripts = [];
+      this.sourceStatus = null;
       this.searchQuery = "";
       this.settingsOpen = false;
       this.uiBuilt = false;
@@ -2037,6 +2161,27 @@
       if (textEl) textEl.textContent = count === 1 ? `${unit} found` : `${unit}s found`;
     }
 
+    _sourceNoticeHtml() {
+      if (!this.sourceStatus) return "";
+      const status = this.sourceStatus;
+      const cls = status.type === "stale" || status.type === "partial" ? "warn" : "bad";
+      const directUrl = this.services[this.currentService].getDirectSearchUrl(this.currentDomain);
+      return `
+        <div class="sf-source-notice ${cls}">
+          <div class="sf-source-notice-title">${escapeHtml(status.title || "Source status")}</div>
+          <div>${escapeHtml(status.detail || "The source returned a degraded result.")} <a href="${escapeHtml(directUrl)}" target="_blank">Search manually</a></div>
+        </div>
+      `;
+    }
+
+    _sourceErrorTitle(err, label) {
+      if (err?.kind === "rate-limit") return `${label} rate limit`;
+      if (err?.kind === "timeout") return `${label} timed out`;
+      if (err?.kind === "backoff") return `${label} is backing off`;
+      if (err?.kind === "parse") return `${label} changed its response`;
+      return `${label} unavailable`;
+    }
+
     // ── Data ────────────────────────────────────────────────────────
     async _loadScripts() {
       if (this.isLoading) return;
@@ -2052,15 +2197,21 @@
         const host = HostService.getCurrentHost();
         this.currentDomain = HostService.extractRootDomain(host);
         this.allScripts = await svc.searchScriptsByHost(this.currentDomain, this.settings);
+        this.sourceStatus = this.allScripts?._sfStatus || null;
         this._setResultCount(this.allScripts.length);
         this._displayScripts();
       } catch(err) {
+        this.sourceStatus = null;
         this._setResultCount(0);
+        const directUrl = svc.getDirectSearchUrl(this.currentDomain);
         _safeHTML(this.content, `
           <div class="sf-error">
-            <div class="sf-error-title">Something went wrong</div>
+            <div class="sf-error-title">${escapeHtml(this._sourceErrorTitle(err, svcLabel))}</div>
             <div class="sf-error-text">${escapeHtml(err?.message || 'Unknown error')}</div>
-            <button class="sf-action-btn ${svcClass}">Try again</button>
+            <div class="sf-error-actions">
+              <button class="sf-action-btn ${svcClass}">Try again</button>
+              <a href="${escapeHtml(directUrl)}" target="_blank" class="sf-action-btn ${svcClass}">Search manually</a>
+            </div>
           </div>
         `);
         this.content.querySelector(".sf-action-btn")?.addEventListener("click", () => this._loadScripts());
@@ -2089,6 +2240,7 @@
       const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", catalogs: "Script Catalogs", githubgist: "GitHub Gists", github: "GitHub" };
       const svcLabel = svcLabels[this.currentService];
       const displayHost = HostService.extractRootDomain(this.currentDomain);
+      const noticeHtml = this._sourceNoticeHtml();
 
       // Update title
       const titleType = this.currentService === "catalogs" ? "Catalogs" : this.currentService === "githubgist" ? "Gists" : ["chromewebstore", "mozillaaddons"].includes(this.currentService) ? "Extensions" : "Scripts";
@@ -2113,11 +2265,12 @@
       if (!scripts.length) {
         const directUrl = this.services[this.currentService].getDirectSearchUrl(this.currentDomain);
         if (this.searchQuery) {
-          _safeHTML(this.content, `<div class="sf-empty"><div class="sf-empty-title">No matches</div><div class="sf-empty-text">No scripts match "${escapeHtml(this.searchQuery)}"</div></div>`);
+          _safeHTML(this.content, `${noticeHtml}<div class="sf-empty"><div class="sf-empty-title">No matches</div><div class="sf-empty-text">No scripts match "${escapeHtml(this.searchQuery)}"</div></div>`);
         } else if (this._hasActiveFilters()) {
-          _safeHTML(this.content, `<div class="sf-empty"><div class="sf-empty-title">No matches</div><div class="sf-empty-text">No scripts match the active filters.</div></div>`);
+          _safeHTML(this.content, `${noticeHtml}<div class="sf-empty"><div class="sf-empty-title">No matches</div><div class="sf-empty-text">No scripts match the active filters.</div></div>`);
         } else {
           _safeHTML(this.content, `
+            ${noticeHtml}
             <div class="sf-empty">
               <div class="sf-empty-title">No scripts found</div>
               <div class="sf-empty-text">Nothing matched <strong>${escapeHtml(displayHost)}</strong> on ${svcLabel}.</div>
@@ -2133,7 +2286,7 @@
       this._setResultCount(this.allScripts.length);
 
       // Build items
-      _safeHTML(this.content, "");
+      _safeHTML(this.content, noticeHtml);
       sorted.forEach((script, i) => {
         const item = this._createScriptItem(script, svcClass, i);
         this.content.appendChild(item);

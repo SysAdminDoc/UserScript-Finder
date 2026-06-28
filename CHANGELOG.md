@@ -2,6 +2,11 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.9.0] - 2026-06-28
+
+- Added per-source request timeouts, rate-limit/backoff classification, stale-cache fallback, degraded-result notices, retry controls, manual-search links, and runtime tests.
+- Clamped the modal width to the viewport so resized/mobile views cannot clip the overlay.
+
 ## [v1.8.1] - 2026-06-28
 
 - Standardized the repository, README, and userscript metadata on the MIT license.
