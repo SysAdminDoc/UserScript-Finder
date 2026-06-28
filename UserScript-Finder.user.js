@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.12.0
+// @version      1.13.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -1410,6 +1410,21 @@
     getDirectSearchUrl(domain) {
       return `${this.baseUrl}/search?q=${encodeURIComponent(domain + ' userscript')}`;
     }
+  }
+
+  if (typeof window !== "undefined" && window.__SF_TEST_HOOKS__) {
+    Object.assign(window.__SF_TEST_HOOKS__, {
+      ScriptService,
+      OpenUserJSScriptService,
+      ChromeWebStoreService,
+      MozillaAddonsService,
+      GitHubScriptService,
+      CatalogScriptService,
+      GitHubGistService,
+      reputationScore,
+      normalizedRating,
+      looksEnglish
+    });
   }
 
   class ToastService {

@@ -1,0 +1,18 @@
+{
+  "items": [
+    {
+      "name": "github-reddit-helper",
+      "full_name": "alice/github-reddit-helper",
+      "description": "GitHub fixture helper",
+      "html_url": "https://github.com/alice/github-reddit-helper",
+      "stargazers_count": 77,
+      "forks_count": 9,
+      "language": "JavaScript",
+      "updated_at": "2026-05-23T00:00:00Z",
+      "created_at": "2026-01-06T00:00:00Z",
+      "topics": ["userscript", "reddit"],
+      "license": { "spdx_id": "MIT" },
+      "owner": { "login": "alice" }
+    }
+  ]
+}

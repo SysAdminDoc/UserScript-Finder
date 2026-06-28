@@ -1,0 +1,26 @@
+{
+  "results": [
+    {
+      "id": 99,
+      "slug": "mozilla-reddit-helper",
+      "name": { "en-US": "Mozilla Reddit Helper" },
+      "summary": { "en-US": "AMO fixture helper" },
+      "url": "https://addons.mozilla.org/en-US/firefox/addon/mozilla-reddit-helper/",
+      "authors": [{ "name": "amo-dev" }],
+      "average_daily_users": 4500,
+      "weekly_downloads": 300,
+      "ratings": { "average": 4.4, "count": 80 },
+      "last_updated": "2026-05-22T00:00:00Z",
+      "created": "2026-01-05T00:00:00Z",
+      "default_locale": "en-US",
+      "current_version": {
+        "version": "1.2.3",
+        "reviewed": "2026-05-21T00:00:00Z",
+        "license": { "name": { "en-US": "MIT" }, "slug": "MIT" }
+      },
+      "categories": ["tabs"],
+      "tags": ["reddit"],
+      "icon_url": "https://example.com/icon.png"
+    }
+  ]
+}

@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.13.0] - 2026-06-28
+
+- Added fixture-backed adapter contract tests for all eight sources plus shared rating, language, and reputation helper checks.
+
 ## [v1.12.0] - 2026-06-28
 
 - Added modal accessibility semantics, live result/status announcements, accessible control names, focus entry/restoration, contained Tab navigation, and accessibility markup tests.
