@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.9.0
+// @version      1.10.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -413,6 +413,53 @@
 
   if (typeof window !== "undefined" && window.__SF_TEST_HOOKS__) {
     window.__SF_TEST_HOOKS__.SourceRuntime = SourceRuntime;
+  }
+
+  const InstallSafety = {
+    allowlists: {
+      greasyfork: ["https://update.greasyfork.org", "https://greasyfork.org"],
+      sleazyfork: ["https://update.greasyfork.org", "https://sleazyfork.org"],
+      openuserjs: ["https://openuserjs.org"],
+      catalogs: [
+        "https://update.greasyfork.org",
+        "https://greasyfork.org",
+        "https://sleazyfork.org",
+        "https://openuserjs.org",
+        "https://raw.githubusercontent.com",
+        "https://gist.githubusercontent.com"
+      ],
+      githubgist: ["https://gist.githubusercontent.com"]
+    },
+
+    validateInstallUrl(script, rawUrl) {
+      if (!rawUrl) return { ok: false, reason: "Missing install URL." };
+      let url;
+      try { url = new URL(rawUrl); }
+      catch { return { ok: false, reason: "Install URL is not a valid URL." }; }
+
+      if (url.protocol !== "https:") return { ok: false, reason: "Install URL must use HTTPS." };
+      const source = script?._source || "greasyfork";
+      const allowed = this.allowlists[source] || [];
+      if (!allowed.includes(url.origin)) return { ok: false, reason: `Install origin ${url.origin} is not trusted for ${SourceRuntime.sourceLabels[source] || source}.` };
+      if (!this.looksLikeUserScriptUrl(url)) return { ok: false, reason: "Install URL does not point to a .user.js payload." };
+
+      return { ok: true, url: url.href };
+    },
+
+    looksLikeUserScriptUrl(url) {
+      const path = decodeURIComponent(url.pathname || "");
+      return /\.user\.js$/i.test(path);
+    },
+
+    hasUserScriptMetadata(source) {
+      const text = String(source || "");
+      const block = text.match(/==UserScript==([\s\S]{0,12000}?)==\/UserScript==/i);
+      return !!(block && /\/\/\s*@name\s+\S+/i.test(block[1]));
+    }
+  };
+
+  if (typeof window !== "undefined" && window.__SF_TEST_HOOKS__) {
+    window.__SF_TEST_HOOKS__.InstallSafety = InstallSafety;
   }
 
   // ── Settings Service ────────────────────────────────────────────────
@@ -1702,6 +1749,9 @@
 .sf-match-preview.bad { border-color: ${THEME.red}33; color: ${THEME.red}; }
 .sf-match-preview-title { font-weight: 800; margin-bottom: 4px; color: ${THEME.text}; }
 .sf-match-preview code { color: ${THEME.subtext1}; word-break: break-all; }
+.sf-install-warning {
+  margin-top: 8px; color: ${THEME.yellow}; font: 700 11px/1.4 inherit;
+}
 
 .sf-script-desc {
   color: ${THEME.subtext0}; font: 400 12px/1.5 inherit;
@@ -2329,7 +2379,7 @@
 
       try {
         if (!script._matchPreview) {
-          const source = await this._fetchPreviewSource(script.code_url);
+          const source = await this._fetchPreviewSource(script.code_url, script);
           script._matchPreview = this._parseMatchCoverage(source, HostService.getCurrentHost(), window.location.href);
         }
         const preview = script._matchPreview;
@@ -2350,10 +2400,12 @@
       }
     }
 
-    _fetchPreviewSource(url) {
+    _fetchPreviewSource(url, script = null) {
+      const validation = InstallSafety.validateInstallUrl(script || { _source: this.currentService }, url);
+      if (!validation.ok) return Promise.reject(new Error(`Preview blocked: ${validation.reason}`));
       return new Promise((resolve, reject) => {
         GM_xmlhttpRequest({
-          method: "GET", url,
+          method: "GET", url: validation.url,
           headers: { Accept: "text/plain,*/*" },
           onload: r => {
             if (r.status >= 200 && r.status < 300) resolve(r.responseText || "");
@@ -2380,6 +2432,31 @@
       return MatchCoverage.hostMatchesPattern(host, pattern);
     }
 
+    async _openInstallTarget(script, button) {
+      const validation = InstallSafety.validateInstallUrl(script, button.dataset.url || script.code_url);
+      if (!validation.ok) {
+        this.toast.show(`Install blocked: ${validation.reason}`);
+        return;
+      }
+
+      const oldHtml = button.innerHTML;
+      button.disabled = true;
+      button.textContent = "Checking...";
+      try {
+        const source = await this._fetchPreviewSource(validation.url, script);
+        if (!InstallSafety.hasUserScriptMetadata(source)) {
+          this.toast.show("Install blocked: .user.js metadata block missing.");
+          return;
+        }
+        GM_openInTab(validation.url, { active: true });
+      } catch(err) {
+        this.toast.show(`Install check failed: ${err?.message || "could not load metadata"}`);
+      } finally {
+        button.disabled = false;
+        _safeHTML(button, oldHtml);
+      }
+    }
+
     _createScriptItem(script, svcClass, index) {
       const item = document.createElement("div");
       item.className = `sf-item ${svcClass}`;
@@ -2401,6 +2478,9 @@
       const baseUrls = { sleazyfork: "https://sleazyfork.org", greasyfork: "https://greasyfork.org", openuserjs: "https://openuserjs.org" };
       const scriptUrl = (isGH || isGist || isCatalog) ? script.url : (script.url?.startsWith("http") ? script.url : (baseUrls[svcClass] || baseUrls.greasyfork) + (script.url || ""));
       const installUrl = script.code_url || null;
+      const installValidation = installUrl ? InstallSafety.validateInstallUrl(script, installUrl) : null;
+      const safeInstallUrl = installValidation?.ok ? installValidation.url : null;
+      const installWarning = installValidation && !installValidation.ok ? `Install blocked: ${installValidation.reason}` : "";
 
       const fanClass = fanScore >= 8 ? "score-high" : fanScore >= 6 ? "score-mid" : fanScore >= 0 ? "score-low" : "";
 
@@ -2461,16 +2541,16 @@
 
       // Non-userscript sources get a "View" button; script registries get "Install".
       let actionBtn;
-      if (isGH || isCWS || isAMO || (isGist && !installUrl) || (isCatalog && !installUrl)) {
+      if (isGH || isCWS || isAMO || !safeInstallUrl) {
         const icon = (isGH || isGist) ? "githubLogo" : "search";
-        const title = isGH ? "View repository" : isGist ? "View gist" : isCatalog ? "Open catalog result" : "View extension";
+        const title = isGH ? "View repository" : isGist ? "View gist" : isCatalog ? "Open catalog result" : isCWS || isAMO ? "View extension" : "View script page";
         actionBtn = `<button class="sf-install-btn" data-url="${escapeHtml(scriptUrl)}" title="${title}">${getIcon(icon)} View</button>`;
-      } else if (installUrl) {
-        actionBtn = `<button class="sf-install-btn" data-url="${escapeHtml(installUrl)}" title="Install script">${getIcon('install')} Install</button>`;
+      } else if (safeInstallUrl) {
+        actionBtn = `<button class="sf-install-btn" data-action="install" data-url="${escapeHtml(safeInstallUrl)}" title="Install script">${getIcon('install')} Install</button>`;
       } else {
         actionBtn = "";
       }
-      const previewBtn = installUrl ? `<button class="sf-preview-btn" data-url="${escapeHtml(installUrl)}" title="Preview match coverage">${getIcon('search')} Coverage</button>` : "";
+      const previewBtn = safeInstallUrl ? `<button class="sf-preview-btn" data-url="${escapeHtml(safeInstallUrl)}" title="Preview match coverage">${getIcon('search')} Coverage</button>` : "";
       const actionsHtml = actionBtn || previewBtn ? `<div class="sf-script-actions">${actionBtn}${previewBtn}</div>` : "";
 
       _safeHTML(item, `
@@ -2487,6 +2567,7 @@
           </div>
           ${actionsHtml}
         </div>
+        ${installWarning ? `<div class="sf-install-warning">${escapeHtml(installWarning)}</div>` : ""}
         <div class="sf-script-desc" title="${escapeHtml(script.description || '')}">${escapeHtml(script.description || "No description")}</div>
         <div class="sf-script-meta">${metaHtml}</div>
         <div class="sf-match-preview hidden"></div>
@@ -2497,7 +2578,8 @@
       if (actionEl) {
         actionEl.addEventListener("click", (e) => {
           e.stopPropagation();
-          GM_openInTab(actionEl.dataset.url, { active: true });
+          if (actionEl.dataset.action === "install") this._openInstallTarget(script, actionEl);
+          else GM_openInTab(actionEl.dataset.url, { active: true });
         });
       }
       const previewEl = item.querySelector(".sf-preview-btn");

@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.10.0] - 2026-06-28
+
+- Added install URL safety checks with per-source HTTPS allowlists, `.user.js` URL validation, metadata-block verification before install handoff, unsafe-result View downgrades, inline warnings, and tests.
+
 ## [v1.9.0] - 2026-06-28
 
 - Added per-source request timeouts, rate-limit/backoff classification, stale-cache fallback, degraded-result notices, retry controls, manual-search links, and runtime tests.

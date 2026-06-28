@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.9.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.10.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -70,6 +70,7 @@ Click your userscript manager icon on any website and pick a source to search:
 |---------|-------------|
 | **Eight Sources** | Search GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, curated catalogs, GitHub Gists, and GitHub from a single interface |
 | **One-Click Install** | Install scripts directly from registries and `.user.js` Gists without leaving the page |
+| **Install Safety** | Validates install origins and `.user.js` metadata before opening a userscript-manager install handoff; unsafe candidates become View actions with an inline warning |
 | **Live Search Filter** | Real-time filtering within results with match count (e.g., `12/47`) |
 | **Result Filters** | Narrow results by recent update window, normalized minimum rating, and English-looking names/descriptions |
 | **Source Resilience** | Adds per-source timeouts, rate-limit/backoff classification, stale-cache fallback, degraded-result notices, retry controls, and manual-search escape hatches |
