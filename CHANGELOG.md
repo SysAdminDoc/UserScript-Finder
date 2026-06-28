@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.15.0] - 2026-06-28
+
+- Added per-source privacy controls that hide disabled sources from menus/tabs, persist source choices, prevent disabled-source network requests, and cover the flow with a browser-backed source privacy test.
+
 ## [v1.14.0] - 2026-06-28
 
 - Added per-source health badges, footer health age, copyable source diagnostics, and diagnostics markup tests while keeping copied diagnostics limited to source, root host, status, timestamps, cache age, and result count.

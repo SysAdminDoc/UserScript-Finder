@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.14.0
+// @version      1.15.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -44,12 +44,29 @@
     : { createHTML: s => s };
   function _safeHTML(el, html) { el.innerHTML = _ttPolicy.createHTML(html); }
 
+  const SOURCE_META = {
+    greasyfork: { label: "GreasyFork", tab: "GreasyFork", menuKind: "Scripts", menuName: "GreasyFork", footerUrl: "https://greasyfork.org", unit: "script" },
+    sleazyfork: { label: "SleazyFork", tab: "SleazyFork", menuKind: "Scripts", menuName: "SleazyFork", footerUrl: "https://sleazyfork.org", unit: "script" },
+    openuserjs: { label: "OpenUserJS", tab: "OpenUserJS", menuKind: "Scripts", menuName: "OpenUserJS", footerUrl: "https://openuserjs.org", unit: "script" },
+    chromewebstore: { label: "Chrome Web Store", tab: "Chrome", menuKind: "Extensions", menuName: "Chrome Web Store", footerUrl: "https://chromewebstore.google.com", unit: "extension" },
+    mozillaaddons: { label: "Mozilla Add-ons", tab: "Firefox", menuKind: "Extensions", menuName: "Mozilla AMO", footerUrl: "https://addons.mozilla.org", unit: "extension" },
+    catalogs: { label: "Script Catalogs", tab: "Catalogs", menuKind: "Catalogs", menuName: "Awesome/Tampermonkey", footerUrl: "https://github.com/awesome-scripts/awesome-userscripts", unit: "catalog result" },
+    githubgist: { label: "GitHub Gists", tab: "Gists", menuKind: "Scripts", menuName: "GitHub Gists", footerUrl: "https://gist.github.com", unit: "gist" },
+    github: { label: "GitHub", tab: "GitHub", menuKind: "Scripts", menuName: "GitHub", footerUrl: "https://github.com", unit: "repo" }
+  };
+  const SOURCE_ORDER = Object.keys(SOURCE_META);
+  const DEFAULT_SOURCE_SETTINGS = SOURCE_ORDER.reduce((settings, source) => {
+    settings[source] = true;
+    return settings;
+  }, {});
+
   // ── Default Settings ────────────────────────────────────────────────
   const DEFAULT_SETTINGS = {
     cacheDuration: 5 * 60 * 1000,
     defaultSort: "daily",
     denseMode: false,
-    lastService: "greasyfork"
+    lastService: "greasyfork",
+    sources: DEFAULT_SOURCE_SETTINGS
   };
 
   // ── Catppuccin Mocha + OLED palette ─────────────────────────────────
@@ -290,16 +307,10 @@
 
   const SourceRuntime = {
     timeoutMs: 12000,
-    sourceLabels: {
-      greasyfork: "GreasyFork",
-      sleazyfork: "SleazyFork",
-      openuserjs: "OpenUserJS",
-      chromewebstore: "Chrome Web Store",
-      mozillaaddons: "Mozilla Add-ons",
-      catalogs: "Script Catalogs",
-      githubgist: "GitHub Gists",
-      github: "GitHub"
-    },
+    sourceLabels: SOURCE_ORDER.reduce((labels, source) => {
+      labels[source] = SOURCE_META[source].label;
+      return labels;
+    }, {}),
 
     label(service) {
       return this.sourceLabels[service?.serviceName] || service?.serviceName || "Source";
@@ -441,6 +452,8 @@
 
   if (typeof window !== "undefined" && window.__SF_TEST_HOOKS__) {
     window.__SF_TEST_HOOKS__.SourceRuntime = SourceRuntime;
+    window.__SF_TEST_HOOKS__.SOURCE_META = SOURCE_META;
+    window.__SF_TEST_HOOKS__.SOURCE_ORDER = SOURCE_ORDER;
   }
 
   const InstallSafety = {
@@ -493,7 +506,26 @@
   // ── Settings Service ────────────────────────────────────────────────
   class SettingsService {
     constructor() { this.settings = this.loadSettings(); }
-    loadSettings() { return { ...DEFAULT_SETTINGS, ...GM_getValue("sf_settings_v4", {}) }; }
+    loadSettings() {
+      const saved = GM_getValue("sf_settings_v4", {}) || {};
+      const settings = { ...DEFAULT_SETTINGS, ...saved };
+      settings.sources = this.normalizeSources(saved.sources);
+      const sourceChanged = SOURCE_ORDER.some(source => saved.sources?.[source] !== settings.sources[source]);
+      let serviceChanged = false;
+      if (!settings.sources[settings.lastService]) {
+        settings.lastService = SOURCE_ORDER.find(source => settings.sources[source]) || "greasyfork";
+        serviceChanged = true;
+      }
+      if (sourceChanged || serviceChanged) GM_setValue("sf_settings_v4", settings);
+      return settings;
+    }
+    normalizeSources(savedSources = {}) {
+      const safeSources = savedSources && typeof savedSources === "object" ? savedSources : {};
+      const normalized = {};
+      SOURCE_ORDER.forEach(source => { normalized[source] = safeSources[source] !== false; });
+      if (!SOURCE_ORDER.some(source => normalized[source])) normalized.greasyfork = true;
+      return normalized;
+    }
     saveSettings() { GM_setValue("sf_settings_v4", this.settings); }
     get(key) { return this.settings[key]; }
     set(key, value) { this.settings[key] = value; this.saveSettings(); }
@@ -1952,12 +1984,22 @@
   display: none; padding: 16px 20px; border-top: 1px solid ${THEME.glassBorder};
   background: ${THEME.surface0}44;
 }
-.sf-settings.visible { display: block; }
+.sf-settings.visible {
+  display: block; max-height: min(36vh, 330px); overflow-y: auto; flex-shrink: 0;
+}
+.sf-settings::-webkit-scrollbar { width: 6px; }
+.sf-settings::-webkit-scrollbar-track { background: transparent; }
+.sf-settings::-webkit-scrollbar-thumb { background: ${THEME.surface2}; border-radius: 3px; }
 .sf-settings-title { font: 700 13px/1 inherit; color: ${THEME.text}; margin-bottom: 12px; }
+.sf-settings-subtitle {
+  font: 800 10px/1 inherit; color: ${THEME.overlay}; text-transform: uppercase;
+  margin: 14px 0 6px; letter-spacing: 0;
+}
 .sf-setting-row {
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 0; border-bottom: 1px solid ${THEME.glassBorder};
 }
+.sf-source-setting-row { padding: 6px 0; }
 .sf-setting-row:last-child { border-bottom: none; }
 .sf-setting-label { font: 500 12px/1.3 inherit; color: ${THEME.subtext1}; }
 .sf-toggle {
@@ -2006,7 +2048,7 @@
         githubgist: new GitHubGistService(),
         github: new GitHubScriptService()
       };
-      this.currentService = this.settings.get("lastService") || "greasyfork";
+      this.currentService = this._firstEnabledSource(this.settings.get("lastService") || "greasyfork");
       this.currentSort = this.settings.get("defaultSort");
       this.filters = { updatedMonths: "any", minRating: "any", englishOnly: false };
       this.currentDomain = HostService.getCurrentHost();
@@ -2030,6 +2072,90 @@
       this._buildUI();
       this._setupEvents();
       this.uiBuilt = true;
+    }
+
+    _serviceClass(serviceName) {
+      return serviceName === "greasyfork" ? "" : serviceName;
+    }
+
+    _isSourceEnabled(serviceName) {
+      return this.settings.get("sources")?.[serviceName] !== false;
+    }
+
+    _enabledSourceNames() {
+      return SOURCE_ORDER.filter(source => this.services[source] && this._isSourceEnabled(source));
+    }
+
+    _firstEnabledSource(preferred = null) {
+      if (preferred && this.services[preferred] && this._isSourceEnabled(preferred)) return preferred;
+      return this._enabledSourceNames()[0] || "greasyfork";
+    }
+
+    _ensureCurrentSource() {
+      const next = this._firstEnabledSource(this.currentService);
+      if (next !== this.currentService) {
+        this.currentService = next;
+        this.settings.set("lastService", next);
+      }
+      return next;
+    }
+
+    _tabsHtml() {
+      this._ensureCurrentSource();
+      return this._enabledSourceNames().map(source => {
+        const active = source === this.currentService;
+        const cls = ["sf-tab", this._serviceClass(source), active ? "active" : ""].filter(Boolean).join(" ");
+        return `<button class="${cls}" role="tab" aria-selected="${active}" data-service="${source}">${escapeHtml(SOURCE_META[source].tab)}</button>`;
+      }).join("");
+    }
+
+    _sourceSettingsHtml() {
+      return SOURCE_ORDER.map(source => {
+        const enabled = this._isSourceEnabled(source);
+        return `
+          <div class="sf-setting-row sf-source-setting-row">
+            <span class="sf-setting-label">${escapeHtml(SOURCE_META[source].label)}</span>
+            <button class="sf-toggle sf-source-toggle ${enabled ? 'on' : ''}" data-source="${source}" aria-label="Enable ${escapeHtml(SOURCE_META[source].label)} source" aria-pressed="${enabled}"></button>
+          </div>
+        `;
+      }).join("");
+    }
+
+    _renderTabs() {
+      if (!this.modal) return;
+      const tabs = this.modal.querySelector(".sf-tabs");
+      if (tabs) _safeHTML(tabs, this._tabsHtml());
+    }
+
+    _syncSourceControls() {
+      if (!this.modal) return;
+      this.modal.querySelectorAll(".sf-source-toggle").forEach(btn => {
+        const enabled = this._isSourceEnabled(btn.dataset.source);
+        btn.classList.toggle("on", enabled);
+        btn.setAttribute("aria-pressed", String(enabled));
+      });
+    }
+
+    _setSourceEnabled(source, enabled) {
+      if (!SOURCE_META[source]) return;
+      const sources = { ...this.settings.get("sources"), [source]: enabled };
+      if (!SOURCE_ORDER.some(name => sources[name])) {
+        this.toast?.show("At least one source must stay enabled");
+        this._syncSourceControls();
+        return;
+      }
+      this.settings.set("sources", sources);
+      let shouldLoad = false;
+      if (!enabled && source === this.currentService) {
+        this.currentService = this._firstEnabledSource();
+        this.settings.set("lastService", this.currentService);
+        shouldLoad = this.isOpen;
+      }
+      this._renderTabs();
+      this._syncSourceControls();
+      this._setupMenuCommands();
+      this._updateTabs();
+      if (shouldLoad) this._loadScripts();
     }
 
     // ── UI Build ────────────────────────────────────────────────────
@@ -2073,14 +2199,7 @@
           </div>
         </div>
         <div class="sf-tabs" role="tablist" aria-label="Result sources">
-          <button class="sf-tab active" role="tab" aria-selected="true" data-service="greasyfork">GreasyFork</button>
-          <button class="sf-tab sleazyfork" role="tab" aria-selected="false" data-service="sleazyfork">SleazyFork</button>
-          <button class="sf-tab openuserjs" role="tab" aria-selected="false" data-service="openuserjs">OpenUserJS</button>
-          <button class="sf-tab chromewebstore" role="tab" aria-selected="false" data-service="chromewebstore">Chrome</button>
-          <button class="sf-tab mozillaaddons" role="tab" aria-selected="false" data-service="mozillaaddons">Firefox</button>
-          <button class="sf-tab catalogs" role="tab" aria-selected="false" data-service="catalogs">Catalogs</button>
-          <button class="sf-tab githubgist" role="tab" aria-selected="false" data-service="githubgist">Gists</button>
-          <button class="sf-tab github" role="tab" aria-selected="false" data-service="github">GitHub</button>
+          ${this._tabsHtml()}
         </div>
         <div class="sf-sort-bar">
           <span class="sf-sort-label">Sort by</span>
@@ -2144,6 +2263,8 @@
               <option value="1800000" ${this.settings.get('cacheDuration')===1800000?'selected':''}>30</option>
             </select>
           </div>
+          <div class="sf-settings-subtitle">Sources</div>
+          ${this._sourceSettingsHtml()}
         </div>
         <div class="sf-footer">
           <div class="sf-footer-text">Data from <a href="https://greasyfork.org" target="_blank">GreasyFork</a><span class="sf-health-pill">Not checked</span></div>
@@ -2173,16 +2294,16 @@
       this.modal.querySelector(".sf-diagnostics-btn").addEventListener("click", () => this._copyDiagnostics());
 
       // Tabs
-      this.modal.querySelectorAll(".sf-tab").forEach(tab => {
-        tab.addEventListener("click", () => {
-          const svc = tab.dataset.service;
-          if (svc !== this.currentService) {
-            this.currentService = svc;
-            this.settings.set("lastService", svc);
-            this._updateTabs();
-            this._loadScripts();
-          }
-        });
+      this.modal.querySelector(".sf-tabs").addEventListener("click", e => {
+        const tab = e.target.closest(".sf-tab");
+        if (!tab) return;
+        const svc = tab.dataset.service;
+        if (svc !== this.currentService && this._isSourceEnabled(svc)) {
+          this.currentService = svc;
+          this.settings.set("lastService", svc);
+          this._updateTabs();
+          this._loadScripts();
+        }
       });
 
       // Sort
@@ -2212,13 +2333,19 @@
       });
 
       // Settings toggles
-      this.modal.querySelectorAll(".sf-toggle").forEach(btn => {
+      this.modal.querySelectorAll(".sf-toggle[data-key]").forEach(btn => {
         btn.addEventListener("click", () => {
           const key = btn.dataset.key;
           const val = !this.settings.get(key);
           this.settings.set(key, val);
           btn.classList.toggle("on", val);
           if (key === "denseMode") this.host.classList.toggle("dense", val);
+        });
+      });
+
+      this.modal.querySelectorAll(".sf-source-toggle").forEach(btn => {
+        btn.addEventListener("click", () => {
+          this._setSourceEnabled(btn.dataset.source, !this._isSourceEnabled(btn.dataset.source));
         });
       });
 
@@ -2248,32 +2375,17 @@
       if (window._sfMenuIds) window._sfMenuIds.forEach(id => { try { GM_unregisterMenuCommand(id); } catch {} });
       window._sfMenuIds = [];
 
+      this._ensureCurrentSource();
       const domain = HostService.extractRootDomain(this.currentDomain);
 
-      window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (GreasyFork)`, () => {
-        this._ensureUI(); this.currentService = "greasyfork"; this._open();
-      }));
-      window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (SleazyFork)`, () => {
-        this._ensureUI(); this.currentService = "sleazyfork"; this._open();
-      }));
-      window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (OpenUserJS)`, () => {
-        this._ensureUI(); this.currentService = "openuserjs"; this._open();
-      }));
-      window._sfMenuIds.push(GM_registerMenuCommand(`Find Extensions for ${domain} (Chrome Web Store)`, () => {
-        this._ensureUI(); this.currentService = "chromewebstore"; this._open();
-      }));
-      window._sfMenuIds.push(GM_registerMenuCommand(`Find Extensions for ${domain} (Mozilla AMO)`, () => {
-        this._ensureUI(); this.currentService = "mozillaaddons"; this._open();
-      }));
-      window._sfMenuIds.push(GM_registerMenuCommand(`Find Catalogs for ${domain} (Awesome/Tampermonkey)`, () => {
-        this._ensureUI(); this.currentService = "catalogs"; this._open();
-      }));
-      window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (GitHub Gists)`, () => {
-        this._ensureUI(); this.currentService = "githubgist"; this._open();
-      }));
-      window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (GitHub)`, () => {
-        this._ensureUI(); this.currentService = "github"; this._open();
-      }));
+      this._enabledSourceNames().forEach(source => {
+        const meta = SOURCE_META[source];
+        window._sfMenuIds.push(GM_registerMenuCommand(`Find ${meta.menuKind} for ${domain} (${meta.menuName})`, () => {
+          this._ensureUI();
+          if (this._isSourceEnabled(source)) this.currentService = source;
+          this._open();
+        }));
+      });
 
       window._sfMenuIds.push(GM_registerMenuCommand("Reset Script Finder Settings", () => {
         GM_deleteValue("sf_settings_v4"); location.reload();
@@ -2308,6 +2420,8 @@
     _open() {
       this.isOpen = true;
       this.previousFocus = document.activeElement;
+      this._ensureCurrentSource();
+      this._renderTabs();
       this._updateTabs();
       this._updateServiceColors();
       this.sortSelect.value = this.currentSort;
@@ -2345,7 +2459,7 @@
 
     _updateServiceColors() {
       const svc = this.currentService;
-      const svcNames = ["greasyfork", "sleazyfork", "openuserjs", "chromewebstore", "mozillaaddons", "catalogs", "githubgist", "github"];
+      const svcNames = SOURCE_ORDER;
       const header = this.modal.querySelector(".sf-modal-header");
       svcNames.forEach(s => header.classList.toggle(s, s === svc));
       svcNames.forEach(s => this.sortSelect.classList.toggle(s, s === svc));
@@ -2354,10 +2468,8 @@
       const footerLink = this.modal.querySelector(".sf-footer a");
       if (footerLink) {
         svcNames.forEach(s => footerLink.classList.toggle(s, s === svc));
-        const labels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", catalogs: "Script Catalogs", githubgist: "GitHub Gists", github: "GitHub" };
-        const urls = { greasyfork: "https://greasyfork.org", sleazyfork: "https://sleazyfork.org", openuserjs: "https://openuserjs.org", chromewebstore: "https://chromewebstore.google.com", mozillaaddons: "https://addons.mozilla.org", catalogs: "https://github.com/awesome-scripts/awesome-userscripts", githubgist: "https://gist.github.com", github: "https://github.com" };
-        footerLink.textContent = labels[svc];
-        footerLink.href = urls[svc];
+        footerLink.textContent = SOURCE_META[svc]?.label || svc;
+        footerLink.href = SOURCE_META[svc]?.footerUrl || "#";
       }
       this._updateHealthUi();
     }
@@ -2365,8 +2477,7 @@
     _setResultCount(count) {
       const countEl = this.modal.querySelector(".sf-subtitle-count");
       const textEl = this.modal.querySelector(".sf-subtitle-text");
-      const units = { github: "repo", githubgist: "gist", catalogs: "catalog result", chromewebstore: "extension", mozillaaddons: "extension" };
-      const unit = units[this.currentService] || "script";
+      const unit = SOURCE_META[this.currentService]?.unit || "script";
       if (countEl) countEl.textContent = count || 0;
       if (textEl) textEl.textContent = count === 1 ? `${unit} found` : `${unit}s found`;
     }
@@ -2478,11 +2589,19 @@
     // ── Data ────────────────────────────────────────────────────────
     async _loadScripts() {
       if (this.isLoading) return;
+      this._ensureCurrentSource();
+      if (!this._isSourceEnabled(this.currentService)) {
+        this.allScripts = [];
+        this.sourceStatus = null;
+        this._setResultCount(0);
+        _safeHTML(this.content, `<div class="sf-empty"><div class="sf-empty-title">Source disabled</div><div class="sf-empty-text">Enable this source in settings to search it.</div></div>`);
+        return;
+      }
       this.isLoading = true;
-      const svc = this.services[this.currentService];
-      const svcClass = this.currentService === "greasyfork" ? "" : this.currentService;
-      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", catalogs: "Script Catalogs", githubgist: "GitHub Gists", github: "GitHub" };
-      const svcLabel = svcLabels[this.currentService];
+      const activeService = this.currentService;
+      const svc = this.services[activeService];
+      const svcClass = this._serviceClass(activeService);
+      const svcLabel = SOURCE_META[activeService]?.label || "Source";
 
       this.content.setAttribute("aria-busy", "true");
       _safeHTML(this.content, `<div class="sf-loading"><div class="sf-spinner ${svcClass}"></div><div class="sf-loading-text">Searching ${svcLabel}...</div></div>`);
@@ -2490,9 +2609,11 @@
       try {
         const host = HostService.getCurrentHost();
         this.currentDomain = host;
-        this.allScripts = await svc.searchScriptsByHost(this.currentDomain, this.settings);
+        const scripts = await svc.searchScriptsByHost(this.currentDomain, this.settings);
+        if (activeService !== this.currentService || !this._isSourceEnabled(activeService)) return;
+        this.allScripts = scripts;
         this.sourceStatus = this.allScripts?._sfStatus || null;
-        this._recordSourceHealth(this.currentService, this.allScripts?._sfHealth || {
+        this._recordSourceHealth(activeService, this.allScripts?._sfHealth || {
           type: "ok",
           title: `${svcLabel} loaded`,
           detail: "Fresh source results loaded.",
@@ -2501,9 +2622,10 @@
         this._setResultCount(this.allScripts.length);
         this._displayScripts();
       } catch(err) {
+        if (activeService !== this.currentService || !this._isSourceEnabled(activeService)) return;
         this.sourceStatus = null;
         this.allScripts = [];
-        this._recordSourceHealth(this.currentService, {
+        this._recordSourceHealth(activeService, {
           type: err?.kind === "rate-limit" ? "rate-limited" : "failed",
           title: this._sourceErrorTitle(err, svcLabel),
           detail: err?.message || "Unknown error",
@@ -2525,6 +2647,7 @@
       } finally {
         this.isLoading = false;
         this.content.setAttribute("aria-busy", "false");
+        if (this.isOpen && activeService !== this.currentService && this._isSourceEnabled(this.currentService)) this._loadScripts();
       }
     }
 
@@ -2544,9 +2667,8 @@
 
     _displayScripts() {
       let scripts = this.allScripts || [];
-      const svcClass = this.currentService === "greasyfork" ? "" : this.currentService;
-      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", catalogs: "Script Catalogs", githubgist: "GitHub Gists", github: "GitHub" };
-      const svcLabel = svcLabels[this.currentService];
+      const svcClass = this._serviceClass(this.currentService);
+      const svcLabel = SOURCE_META[this.currentService]?.label || "Source";
       const displayHost = HostService.extractRootDomain(this.currentDomain);
       const noticeHtml = this._sourceNoticeHtml();
 
