@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.6.0
+// @version      1.7.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -171,6 +171,22 @@
     const forks = Number(script?._forks) || 0;
     const curated = script?._catalog_source === "Awesome Userscripts" ? 100000 : script?._catalog_source ? 30000 : 0;
     return curated + (Math.log10(installs + 1) * 1000) + (ratings * 10) + (quality * 250) + (stars * 15) + (forks * 25);
+  }
+
+  function normalizedRating(script) {
+    if (script?._rating != null) return Number(script._rating);
+    if (script?.fan_score != null) return Number(script.fan_score) / 2;
+    return null;
+  }
+
+  function looksEnglish(script) {
+    const locale = String(script?.locale || script?._locale || "").toLowerCase();
+    if (locale) return locale.startsWith("en");
+    const text = `${script?.name || ""} ${script?.description || ""}`;
+    if (!text.trim()) return true;
+    const latin = (text.match(/[A-Za-z]/g) || []).length;
+    const nonLatin = (text.match(/[^\x00-\x7F]/g) || []).length;
+    return nonLatin === 0 || latin / Math.max(latin + nonLatin, 1) >= 0.8;
   }
 
   // ── Settings Service ────────────────────────────────────────────────
@@ -1343,6 +1359,12 @@
   border-bottom: 1px solid ${THEME.glassBorder};
   display: flex; align-items: center; gap: 10px;
 }
+.sf-filter-bar {
+  padding: 10px 20px; background: ${THEME.surface0}18;
+  border-bottom: 1px solid ${THEME.glassBorder};
+  display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center; gap: 8px;
+}
 .sf-sort-label { font: 600 12px/1 inherit; color: ${THEME.subtext0}; flex-shrink: 0; }
 .sf-sort-select {
   flex: 1; padding: 7px 10px; border-radius: 8px;
@@ -1350,7 +1372,16 @@
   color: ${THEME.text}; font: 500 12px/1 inherit; cursor: pointer; outline: none;
   transition: border-color 0.2s ease;
 }
+.sf-filter-select, .sf-filter-toggle {
+  min-width: 0; padding: 7px 9px; border-radius: 8px;
+  border: 1px solid ${THEME.glassBorder}; background: ${THEME.surface0};
+  color: ${THEME.text}; font: 600 11px/1 inherit; cursor: pointer; outline: none;
+}
+.sf-filter-toggle.active {
+  background: ${THEME.green}22; color: ${THEME.green}; border-color: ${THEME.green}44;
+}
 .sf-sort-select option { background: ${THEME.surface1}; color: ${THEME.text}; }
+.sf-filter-select option { background: ${THEME.surface1}; color: ${THEME.text}; }
 .sf-sort-select:focus { border-color: ${THEME.green}44; }
 .sf-sort-select.sleazyfork:focus { border-color: ${THEME.purple}44; }
 .sf-sort-select.openuserjs:focus { border-color: ${THEME.openuserjs}44; }
@@ -1556,6 +1587,8 @@
   .sf-modal-header { padding: 14px 16px; }
   .sf-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 8px 16px; }
   .sf-sort-bar, .sf-search-wrap { padding-left: 16px; padding-right: 16px; }
+  .sf-filter-bar { grid-template-columns: 1fr 1fr; padding-left: 16px; padding-right: 16px; }
+  .sf-filter-bar .sf-sort-label { display: none; }
   .sf-item { padding: 12px 16px; }
   .sf-footer { padding: 10px 16px; flex-wrap: wrap; justify-content: center; }
 }
@@ -1577,6 +1610,7 @@
       };
       this.currentService = this.settings.get("lastService") || "greasyfork";
       this.currentSort = this.settings.get("defaultSort");
+      this.filters = { updatedMonths: "any", minRating: "any", englishOnly: false };
       this.currentDomain = HostService.extractRootDomain(HostService.getCurrentHost());
       this.isOpen = false;
       this.isLoading = false;
@@ -1654,6 +1688,23 @@
             <option value="createdate">Created</option>
           </select>
         </div>
+        <div class="sf-filter-bar">
+          <span class="sf-sort-label">Filters</span>
+          <select class="sf-filter-select" data-filter="updatedMonths" title="Updated within">
+            <option value="any">Any update</option>
+            <option value="3">3 months</option>
+            <option value="6">6 months</option>
+            <option value="12">12 months</option>
+            <option value="24">24 months</option>
+          </select>
+          <select class="sf-filter-select" data-filter="minRating" title="Minimum rating">
+            <option value="any">Any rating</option>
+            <option value="3">3+ rating</option>
+            <option value="4">4+ rating</option>
+            <option value="4.5">4.5+ rating</option>
+          </select>
+          <button class="sf-filter-toggle" data-filter="englishOnly" title="English-looking names and descriptions">English</button>
+        </div>
         <div class="sf-content">
           <div class="sf-loading">
             <div class="sf-spinner"></div>
@@ -1700,6 +1751,7 @@
       this.searchCount = this.modal.querySelector(".sf-search-count");
       this.searchBox = this.modal.querySelector(".sf-search-box");
       this.sortSelect = this.modal.querySelector(".sf-sort-select");
+      this.filterBar = this.modal.querySelector(".sf-filter-bar");
 
       if (this.settings.get("denseMode")) this.host.classList.add("dense");
 
@@ -1728,6 +1780,19 @@
       // Sort
       this.sortSelect.addEventListener("change", e => {
         this.currentSort = e.target.value;
+        this._displayScripts();
+      });
+
+      this.modal.querySelectorAll(".sf-filter-select").forEach(sel => {
+        sel.addEventListener("change", () => {
+          this.filters[sel.dataset.filter] = sel.value;
+          this._displayScripts();
+        });
+      });
+
+      this.modal.querySelector(".sf-filter-toggle").addEventListener("click", e => {
+        this.filters.englishOnly = !this.filters.englishOnly;
+        e.currentTarget.classList.toggle("active", this.filters.englishOnly);
         this._displayScripts();
       });
 
@@ -1928,12 +1993,16 @@
           (s._topics || []).some(t => t.toLowerCase().includes(this.searchQuery))
         );
       }
-      this.searchCount.textContent = this.searchQuery ? `${scripts.length}/${this.allScripts.length}` : "";
+      scripts = this._applyFilters(scripts);
+      const constrained = this.searchQuery || this._hasActiveFilters();
+      this.searchCount.textContent = constrained ? `${scripts.length}/${this.allScripts.length}` : "";
 
       if (!scripts.length) {
         const directUrl = this.services[this.currentService].getDirectSearchUrl(this.currentDomain);
         if (this.searchQuery) {
           _safeHTML(this.content, `<div class="sf-empty"><div class="sf-empty-title">No matches</div><div class="sf-empty-text">No scripts match "${escapeHtml(this.searchQuery)}"</div></div>`);
+        } else if (this._hasActiveFilters()) {
+          _safeHTML(this.content, `<div class="sf-empty"><div class="sf-empty-title">No matches</div><div class="sf-empty-text">No scripts match the active filters.</div></div>`);
         } else {
           _safeHTML(this.content, `
             <div class="sf-empty">
@@ -1955,6 +2024,30 @@
       sorted.forEach((script, i) => {
         const item = this._createScriptItem(script, svcClass, i);
         this.content.appendChild(item);
+      });
+    }
+
+    _hasActiveFilters() {
+      return this.filters.updatedMonths !== "any" || this.filters.minRating !== "any" || this.filters.englishOnly;
+    }
+
+    _applyFilters(scripts) {
+      const updatedMonths = this.filters.updatedMonths;
+      const minRating = this.filters.minRating;
+      const cutoff = updatedMonths === "any" ? null : Date.now() - (Number(updatedMonths) * 30 * 24 * 60 * 60 * 1000);
+      const ratingFloor = minRating === "any" ? null : Number(minRating);
+
+      return scripts.filter(script => {
+        if (cutoff) {
+          const updated = new Date(script.code_updated_at || 0).getTime();
+          if (!Number.isFinite(updated) || updated < cutoff) return false;
+        }
+        if (ratingFloor != null) {
+          const rating = normalizedRating(script);
+          if (rating == null || rating < ratingFloor) return false;
+        }
+        if (this.filters.englishOnly && !looksEnglish(script)) return false;
+        return true;
       });
     }
 
