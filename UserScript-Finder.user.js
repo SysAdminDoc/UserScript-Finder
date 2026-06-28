@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.8.0
+// @version      1.8.1
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -25,7 +25,7 @@
 // @connect      gist.githubusercontent.com
 // @connect      api.github.com
 // @connect      raw.githubusercontent.com
-// @license      WTFPL
+// @license      MIT
 // @run-at       document-idle
 // @downloadURL  https://raw.githubusercontent.com/SysAdminDoc/UserScript-Finder/main/UserScript-Finder.user.js
 // @updateURL    https://raw.githubusercontent.com/SysAdminDoc/UserScript-Finder/main/UserScript-Finder.user.js

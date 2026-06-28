@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.8.1] - 2026-06-28
+
+- Standardized the repository, README, and userscript metadata on the MIT license.
+
 ## [v1.8.0] - 2026-06-27
 
 - Added inline match coverage previews for installable scripts by fetching raw userscript metadata and comparing `@match`, `@include`, and `@exclude` rules against the current host.

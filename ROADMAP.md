@@ -74,13 +74,6 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
 
 ## Research-Driven Additions
 
-- [ ] P0 - Resolve license metadata mismatch
-  Why: The install surface currently reports WTFPL while the repo license file is MIT, which weakens trust and release hygiene.
-  Evidence: `LICENSE`, `README.md`, `UserScript-Finder.user.js` metadata.
-  Touches: `LICENSE`, `README.md`, `UserScript-Finder.user.js`, release notes.
-  Acceptance: One canonical SPDX license appears in the license file, README badge/text, userscript `@license`, and any release notes.
-  Complexity: S
-
 - [ ] P0 - Add source timeouts, backoff, and stale-cache fallback
   Why: Adapter failures and rate limits can collapse into empty results, making outages look like no scripts exist.
   Evidence: `UserScript-Finder.user.js` adapter `_fetch` methods, `_loadScripts`; GitHub Search API rate-limit docs.

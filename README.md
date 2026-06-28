@@ -5,8 +5,8 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.8.0-blue" alt="Version">
-  <img src="https://img.shields.io/badge/license-WTFPL-green" alt="License">
+  <img src="https://img.shields.io/badge/version-1.8.1-blue" alt="Version">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
 </p>
@@ -171,7 +171,7 @@ A: The dark OLED theme is baked in — no light mode. This is intentional.
 
 ## License
 
-[WTFPL](http://www.wtfpl.net/) — Do What The F*** You Want To Public License.
+[MIT](LICENSE) — permissive open-source license.
 
 ## Contributing
 
