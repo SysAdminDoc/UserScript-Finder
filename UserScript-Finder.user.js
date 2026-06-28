@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.2.0
+// @version      1.3.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -18,6 +18,7 @@
 // @connect      sleazyfork.org
 // @connect      openuserjs.org
 // @connect      chromewebstore.google.com
+// @connect      addons.mozilla.org
 // @connect      api.github.com
 // @connect      raw.githubusercontent.com
 // @license      WTFPL
@@ -84,6 +85,9 @@
     chromewebstore: '#f9e2af',
     chromewebstoreDim: '#fbbc04',
     glowChromeWebStore: 'rgba(249, 226, 175, 0.15)',
+    mozillaaddons: '#ff8a3d',
+    mozillaaddonsDim: '#e66000',
+    glowMozillaAddons: 'rgba(255, 138, 61, 0.15)',
     github:     '#f0883e',
     githubDim:  '#d2691e',
     glowGithub: 'rgba(240, 136, 62, 0.15)',
@@ -524,6 +528,111 @@
     }
   }
 
+  class MozillaAddonsService {
+    constructor() {
+      this.serviceName = "mozillaaddons";
+      this.baseUrl = "https://addons.mozilla.org";
+      this.cache = new Map();
+    }
+
+    async searchScriptsByHost(host, settings) {
+      let extensions = await this._searchWithDomain(host, settings);
+      if (extensions.length === 0) {
+        const root = HostService.extractRootDomain(host);
+        if (root !== host) extensions = await this._searchWithDomain(root, settings);
+      }
+      return extensions;
+    }
+
+    async _searchWithDomain(domain, settings) {
+      const cacheKey = `mozillaaddons_${domain}`;
+      const cacheDuration = settings.get("cacheDuration");
+      const cached = this.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < cacheDuration) return cached.data;
+
+      let extensions = [];
+      try {
+        const data = await this._fetchSearch(domain);
+        extensions = (data?.results || []).map(addon => this._normalize(addon)).filter(Boolean).slice(0, 25);
+      } catch {
+        extensions = [];
+      }
+
+      this.cache.set(cacheKey, { data: extensions, timestamp: Date.now() });
+      return extensions;
+    }
+
+    _fetchSearch(domain) {
+      return this._fetch(`${this.baseUrl}/api/v5/addons/search/?q=${encodeURIComponent(domain)}&type=extension&page_size=25`);
+    }
+
+    _fetch(url) {
+      return new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+          method: "GET", url,
+          headers: { Accept: "application/json" },
+          onload: r => {
+            if (r.status === 200) { try { resolve(JSON.parse(r.responseText)); } catch(e) { reject(e); } }
+            else if (r.status === 404) resolve({ results: [] });
+            else reject(new Error(`Mozilla Add-ons ${r.status}`));
+          },
+          onerror: reject
+        });
+      });
+    }
+
+    _normalize(addon) {
+      const name = this._localized(addon.name, addon.default_locale);
+      if (!name || !addon.url) return null;
+
+      const rating = Number(addon.ratings?.average);
+      const ratingCount = Number(addon.ratings?.count);
+      const users = Number(addon.average_daily_users);
+      const weeklyDownloads = Number(addon.weekly_downloads);
+      const author = addon.authors?.[0]?.name || addon.authors?.[0]?.username || null;
+      const license = addon.current_version?.license;
+
+      return {
+        _source: "mozillaaddons",
+        name,
+        description: this._stripHtml(this._localized(addon.summary, addon.default_locale) || this._localized(addon.description, addon.default_locale)),
+        url: addon.url,
+        code_url: null,
+        version: addon.current_version?.version || null,
+        license: this._localized(license?.name, addon.default_locale) || license?.slug || null,
+        users: [{ name: author }],
+        daily_installs: null,
+        total_installs: Number.isFinite(users) ? users : null,
+        good_ratings: Number.isFinite(rating) ? rating : null,
+        fan_score: null,
+        code_updated_at: addon.last_updated || addon.current_version?.reviewed || null,
+        created_at: addon.created || null,
+        _rating: Number.isFinite(rating) ? rating : null,
+        _rating_count: Number.isFinite(ratingCount) ? ratingCount : null,
+        _weekly_downloads: Number.isFinite(weeklyDownloads) ? weeklyDownloads : null,
+        _category: addon.categories?.[0] || null,
+        _image: addon.icon_url || null,
+        _full_name: addon.slug || String(addon.id || ""),
+        _topics: [...(addon.tags || []), ...(addon.categories || [])]
+      };
+    }
+
+    _localized(value, locale) {
+      if (!value) return "";
+      if (typeof value === "string") return value;
+      return value["en-US"] || value[locale] || value[Object.keys(value)[0]] || "";
+    }
+
+    _stripHtml(value) {
+      const doc = new DOMParser().parseFromString(String(value || ""), "text/html");
+      return (doc.body?.textContent || "").replace(/\s+/g, " ").trim();
+    }
+
+    getDirectSearchUrl(domain) {
+      return `${this.baseUrl}/en-US/firefox/search/?q=${encodeURIComponent(domain)}&type=extension`;
+    }
+  }
+
   // ── GitHub Script Service ───────────────────────────────────────────
   class GitHubScriptService {
     constructor() {
@@ -739,6 +848,7 @@
 .sf-modal-header.sleazyfork::before { background: linear-gradient(90deg, ${THEME.purple}, ${THEME.mauve}); }
 .sf-modal-header.openuserjs::before { background: linear-gradient(90deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}); }
 .sf-modal-header.chromewebstore::before { background: linear-gradient(90deg, ${THEME.chromewebstoreDim}, ${THEME.chromewebstore}); }
+.sf-modal-header.mozillaaddons::before { background: linear-gradient(90deg, ${THEME.mozillaaddonsDim}, ${THEME.mozillaaddons}); }
 .sf-modal-header.github::before { background: linear-gradient(90deg, ${THEME.github}, ${THEME.peach}); }
 
 .sf-header-row { display: flex; align-items: center; gap: 12px; }
@@ -785,6 +895,7 @@
 .sf-search-box.sleazyfork:focus-within { border-color: ${THEME.purple}33; box-shadow: 0 0 0 3px ${THEME.purple}11; }
 .sf-search-box.openuserjs:focus-within { border-color: ${THEME.openuserjs}33; box-shadow: 0 0 0 3px ${THEME.openuserjs}11; }
 .sf-search-box.chromewebstore:focus-within { border-color: ${THEME.chromewebstore}44; box-shadow: 0 0 0 3px ${THEME.chromewebstore}11; }
+.sf-search-box.mozillaaddons:focus-within { border-color: ${THEME.mozillaaddons}44; box-shadow: 0 0 0 3px ${THEME.mozillaaddons}11; }
 .sf-search-box.github:focus-within { border-color: ${THEME.github}33; box-shadow: 0 0 0 3px ${THEME.github}11; }
 .sf-search-box svg { width: 14px; height: 14px; color: ${THEME.overlay}; flex-shrink: 0; }
 .sf-search-input {
@@ -797,7 +908,7 @@
 
 /* Tabs */
 .sf-tabs {
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
   padding: 10px 20px; background: ${THEME.surface0}44;
   border-bottom: 1px solid ${THEME.glassBorder};
 }
@@ -828,6 +939,11 @@
   color: ${THEME.chromewebstore}; border-color: ${THEME.chromewebstore}44;
   box-shadow: 0 0 16px ${THEME.glowChromeWebStore};
 }
+.sf-tab.mozillaaddons.active {
+  background: linear-gradient(135deg, ${THEME.mozillaaddonsDim}44, ${THEME.mozillaaddons}22);
+  color: ${THEME.mozillaaddons}; border-color: ${THEME.mozillaaddons}44;
+  box-shadow: 0 0 16px ${THEME.glowMozillaAddons};
+}
 .sf-tab.github.active {
   background: linear-gradient(135deg, ${THEME.githubDim}44, ${THEME.github}22);
   color: ${THEME.github}; border-color: ${THEME.github}33;
@@ -852,6 +968,7 @@
 .sf-sort-select.sleazyfork:focus { border-color: ${THEME.purple}44; }
 .sf-sort-select.openuserjs:focus { border-color: ${THEME.openuserjs}44; }
 .sf-sort-select.chromewebstore:focus { border-color: ${THEME.chromewebstore}44; }
+.sf-sort-select.mozillaaddons:focus { border-color: ${THEME.mozillaaddons}44; }
 .sf-sort-select.github:focus { border-color: ${THEME.github}44; }
 
 /* Content */
@@ -879,6 +996,7 @@
 .sf-item.sleazyfork:hover::after { background: linear-gradient(180deg, ${THEME.purple}, ${THEME.mauve}); }
 .sf-item.openuserjs:hover::after { background: linear-gradient(180deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}); }
 .sf-item.chromewebstore:hover::after { background: linear-gradient(180deg, ${THEME.chromewebstoreDim}, ${THEME.chromewebstore}); }
+.sf-item.mozillaaddons:hover::after { background: linear-gradient(180deg, ${THEME.mozillaaddonsDim}, ${THEME.mozillaaddons}); }
 .sf-item.github:hover::after { background: linear-gradient(180deg, ${THEME.github}, ${THEME.peach}); }
 .sf-item:last-child { border-bottom: none; }
 
@@ -900,6 +1018,7 @@
 .sf-item.sleazyfork .sf-script-title:hover { color: ${THEME.purple}; }
 .sf-item.openuserjs .sf-script-title:hover { color: ${THEME.openuserjs}; }
 .sf-item.chromewebstore .sf-script-title:hover { color: ${THEME.chromewebstore}; }
+.sf-item.mozillaaddons .sf-script-title:hover { color: ${THEME.mozillaaddons}; }
 .sf-item.github .sf-script-title:hover { color: ${THEME.github}; }
 
 .sf-script-sub {
@@ -925,6 +1044,8 @@
 .sf-item.openuserjs .sf-install-btn:hover { background: ${THEME.openuserjs}44; }
 .sf-item.chromewebstore .sf-install-btn { background: ${THEME.chromewebstore}22; color: ${THEME.chromewebstore}; }
 .sf-item.chromewebstore .sf-install-btn:hover { background: ${THEME.chromewebstore}44; }
+.sf-item.mozillaaddons .sf-install-btn { background: ${THEME.mozillaaddons}22; color: ${THEME.mozillaaddons}; }
+.sf-item.mozillaaddons .sf-install-btn:hover { background: ${THEME.mozillaaddons}44; }
 .sf-item.github .sf-install-btn { background: ${THEME.github}22; color: ${THEME.github}; }
 .sf-item.github .sf-install-btn:hover { background: ${THEME.github}44; }
 
@@ -956,6 +1077,7 @@
 .sf-spinner.sleazyfork { border-top-color: ${THEME.purple}; }
 .sf-spinner.openuserjs { border-top-color: ${THEME.openuserjs}; }
 .sf-spinner.chromewebstore { border-top-color: ${THEME.chromewebstore}; }
+.sf-spinner.mozillaaddons { border-top-color: ${THEME.mozillaaddons}; }
 .sf-spinner.github { border-top-color: ${THEME.github}; }
 .sf-loading-text { font: 500 13px/1 inherit; color: ${THEME.subtext0}; }
 
@@ -974,6 +1096,7 @@
 .sf-action-btn.sleazyfork { background: linear-gradient(135deg, ${THEME.purpleDim}, ${THEME.purple}88); }
 .sf-action-btn.openuserjs { background: linear-gradient(135deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}88); }
 .sf-action-btn.chromewebstore { background: linear-gradient(135deg, ${THEME.chromewebstoreDim}, ${THEME.chromewebstore}88); }
+.sf-action-btn.mozillaaddons { background: linear-gradient(135deg, ${THEME.mozillaaddonsDim}, ${THEME.mozillaaddons}88); }
 .sf-action-btn.github { background: linear-gradient(135deg, ${THEME.githubDim}, ${THEME.github}88); }
 
 /* Footer */
@@ -989,6 +1112,7 @@
 .sf-footer a.sleazyfork { color: ${THEME.purple}; }
 .sf-footer a.openuserjs { color: ${THEME.openuserjs}; }
 .sf-footer a.chromewebstore { color: ${THEME.chromewebstore}; }
+.sf-footer a.mozillaaddons { color: ${THEME.mozillaaddons}; }
 .sf-footer a.github { color: ${THEME.github}; }
 
 /* Settings panel */
@@ -1043,6 +1167,7 @@
         sleazyfork: new ScriptService("https://sleazyfork.org", "sleazyfork"),
         openuserjs: new OpenUserJSScriptService(),
         chromewebstore: new ChromeWebStoreService(),
+        mozillaaddons: new MozillaAddonsService(),
         github: new GitHubScriptService()
       };
       this.currentService = this.settings.get("lastService") || "greasyfork";
@@ -1107,6 +1232,7 @@
           <button class="sf-tab sleazyfork" data-service="sleazyfork">SleazyFork</button>
           <button class="sf-tab openuserjs" data-service="openuserjs">OpenUserJS</button>
           <button class="sf-tab chromewebstore" data-service="chromewebstore">Chrome</button>
+          <button class="sf-tab mozillaaddons" data-service="mozillaaddons">Firefox</button>
           <button class="sf-tab github" data-service="github">GitHub</button>
         </div>
         <div class="sf-sort-bar">
@@ -1249,6 +1375,9 @@
       window._sfMenuIds.push(GM_registerMenuCommand(`Find Extensions for ${domain} (Chrome Web Store)`, () => {
         this._ensureUI(); this.currentService = "chromewebstore"; this._open();
       }));
+      window._sfMenuIds.push(GM_registerMenuCommand(`Find Extensions for ${domain} (Mozilla AMO)`, () => {
+        this._ensureUI(); this.currentService = "mozillaaddons"; this._open();
+      }));
       window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (GitHub)`, () => {
         this._ensureUI(); this.currentService = "github"; this._open();
       }));
@@ -1290,7 +1419,7 @@
 
     _updateServiceColors() {
       const svc = this.currentService;
-      const svcNames = ["greasyfork", "sleazyfork", "openuserjs", "chromewebstore", "github"];
+      const svcNames = ["greasyfork", "sleazyfork", "openuserjs", "chromewebstore", "mozillaaddons", "github"];
       const header = this.modal.querySelector(".sf-modal-header");
       svcNames.forEach(s => header.classList.toggle(s, s === svc));
       svcNames.forEach(s => this.sortSelect.classList.toggle(s, s === svc));
@@ -1299,8 +1428,8 @@
       const footerLink = this.modal.querySelector(".sf-footer a");
       if (footerLink) {
         svcNames.forEach(s => footerLink.classList.toggle(s, s === svc));
-        const labels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", github: "GitHub" };
-        const urls = { greasyfork: "https://greasyfork.org", sleazyfork: "https://sleazyfork.org", openuserjs: "https://openuserjs.org", chromewebstore: "https://chromewebstore.google.com", github: "https://github.com" };
+        const labels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", github: "GitHub" };
+        const urls = { greasyfork: "https://greasyfork.org", sleazyfork: "https://sleazyfork.org", openuserjs: "https://openuserjs.org", chromewebstore: "https://chromewebstore.google.com", mozillaaddons: "https://addons.mozilla.org", github: "https://github.com" };
         footerLink.textContent = labels[svc];
         footerLink.href = urls[svc];
       }
@@ -1309,7 +1438,7 @@
     _setResultCount(count) {
       const countEl = this.modal.querySelector(".sf-subtitle-count");
       const textEl = this.modal.querySelector(".sf-subtitle-text");
-      const units = { github: "repo", chromewebstore: "extension" };
+      const units = { github: "repo", chromewebstore: "extension", mozillaaddons: "extension" };
       const unit = units[this.currentService] || "script";
       if (countEl) countEl.textContent = count || 0;
       if (textEl) textEl.textContent = count === 1 ? `${unit} found` : `${unit}s found`;
@@ -1321,7 +1450,7 @@
       this.isLoading = true;
       const svc = this.services[this.currentService];
       const svcClass = this.currentService === "greasyfork" ? "" : this.currentService;
-      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", github: "GitHub" };
+      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", github: "GitHub" };
       const svcLabel = svcLabels[this.currentService];
 
       _safeHTML(this.content, `<div class="sf-loading"><div class="sf-spinner ${svcClass}"></div><div class="sf-loading-text">Searching ${svcLabel}...</div></div>`);
@@ -1363,12 +1492,12 @@
     _displayScripts() {
       let scripts = this.allScripts || [];
       const svcClass = this.currentService === "greasyfork" ? "" : this.currentService;
-      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", github: "GitHub" };
+      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", github: "GitHub" };
       const svcLabel = svcLabels[this.currentService];
       const displayHost = HostService.extractRootDomain(this.currentDomain);
 
       // Update title
-      const titleType = this.currentService === "chromewebstore" ? "Extensions" : "Scripts";
+      const titleType = ["chromewebstore", "mozillaaddons"].includes(this.currentService) ? "Extensions" : "Scripts";
       this.modal.querySelector(".sf-modal-title").textContent = `${titleType} for ${displayHost}`;
 
       // Filter by search
@@ -1418,6 +1547,7 @@
 
       const isGH = script._source === "github";
       const isCWS = script._source === "chromewebstore";
+      const isAMO = script._source === "mozillaaddons";
       const daily = formatNumber(script.daily_installs);
       const total = formatNumber(script.total_installs);
       const good = formatNumber(script.good_ratings);
@@ -1450,7 +1580,7 @@
           ${badge("clockwise", updated, "Updated")}
           ${badge("calendarPlus", created, "Created")}
         `;
-      } else if (isCWS) {
+      } else if (isCWS || isAMO) {
         const totalUsers = formatNumber(script.total_installs);
         const rating = script._rating != null ? Number(script._rating).toFixed(1) : null;
         const ratingCount = formatNumber(script._rating_count);
@@ -1473,7 +1603,7 @@
 
       // Non-userscript sources get a "View" button; script registries get "Install".
       let actionBtn;
-      if (isGH || isCWS) {
+      if (isGH || isCWS || isAMO) {
         const icon = isGH ? "githubLogo" : "search";
         const title = isGH ? "View repository" : "View extension";
         actionBtn = `<button class="sf-install-btn" data-url="${escapeHtml(scriptUrl)}" title="${title}">${getIcon(icon)} View</button>`;
