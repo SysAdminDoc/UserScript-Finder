@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.3.0
+// @version      1.4.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -19,6 +19,7 @@
 // @connect      openuserjs.org
 // @connect      chromewebstore.google.com
 // @connect      addons.mozilla.org
+// @connect      gist.github.com
 // @connect      api.github.com
 // @connect      raw.githubusercontent.com
 // @license      WTFPL
@@ -88,6 +89,9 @@
     mozillaaddons: '#ff8a3d',
     mozillaaddonsDim: '#e66000',
     glowMozillaAddons: 'rgba(255, 138, 61, 0.15)',
+    githubgist: '#f2cdcd',
+    githubgistDim: '#e78284',
+    glowGitHubGist: 'rgba(242, 205, 205, 0.15)',
     github:     '#f0883e',
     githubDim:  '#d2691e',
     glowGithub: 'rgba(240, 136, 62, 0.15)',
@@ -722,6 +726,177 @@
   }
 
   // ── Toast Service ───────────────────────────────────────────────────
+  class GitHubGistService {
+    constructor() {
+      this.serviceName = "githubgist";
+      this.baseUrl = "https://gist.github.com";
+      this.cache = new Map();
+    }
+
+    async searchScriptsByHost(host, settings) {
+      let scripts = await this._searchWithDomain(host, settings);
+      if (scripts.length === 0) {
+        const root = HostService.extractRootDomain(host);
+        if (root !== host) scripts = await this._searchWithDomain(root, settings);
+      }
+      return scripts;
+    }
+
+    async _searchWithDomain(domain, settings) {
+      const cacheKey = `githubgist_${domain}`;
+      const cacheDuration = settings.get("cacheDuration");
+      const cached = this.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < cacheDuration) return cached.data;
+
+      const queries = [
+        `${domain} userscript`,
+        `${domain} tampermonkey`,
+        `${domain} greasemonkey`
+      ];
+      const results = [];
+      const seen = new Set();
+
+      for (const query of queries) {
+        try {
+          const html = await this._fetchSearch(query);
+          for (const script of this._parseSearchResults(html)) {
+            const key = script._full_name;
+            if (!seen.has(key)) {
+              seen.add(key);
+              results.push(script);
+            }
+          }
+        } catch { /* GitHub search can throttle or vary by query; keep partial results. */ }
+      }
+
+      this.cache.set(cacheKey, { data: results, timestamp: Date.now() });
+      return results;
+    }
+
+    _fetchSearch(query) {
+      return this._fetch(`${this.baseUrl}/search?q=${encodeURIComponent(query)}`);
+    }
+
+    _fetch(url) {
+      return new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+          method: "GET", url,
+          headers: { Accept: "text/html,application/xhtml+xml" },
+          onload: r => {
+            if (r.status === 200) resolve(r.responseText || "");
+            else if (r.status === 404) resolve("");
+            else reject(new Error(`GitHub Gists ${r.status}`));
+          },
+          onerror: reject
+        });
+      });
+    }
+
+    _parseSearchResults(html) {
+      if (!html || typeof DOMParser !== "function") return [];
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const snippets = Array.from(doc.querySelectorAll(".gist-snippet"));
+      const seen = new Set();
+
+      return snippets.map(snippet => this._normalizeSnippet(snippet)).filter(script => {
+        if (!script || seen.has(script._full_name)) return false;
+        seen.add(script._full_name);
+        return true;
+      }).slice(0, 100);
+    }
+
+    _normalizeSnippet(snippet) {
+      const fileLink = Array.from(snippet.querySelectorAll('a[href]')).find(link => {
+        const href = link.getAttribute("href") || "";
+        return /^\/[^/]+\/[a-f0-9]{32}$/i.test(href) && link.querySelector(".css-truncate-target");
+      });
+      if (!fileLink) return null;
+
+      const path = fileLink.getAttribute("href");
+      const match = path.match(/^\/([^/]+)\/([a-f0-9]{32})$/i);
+      if (!match) return null;
+
+      const owner = this._decodePathSegment(match[1]);
+      const id = match[2];
+      const fileName = this._cleanText(fileLink.querySelector(".css-truncate-target")?.textContent) || id;
+      const updatedEl = snippet.querySelector("relative-time[datetime]");
+      const descEl = snippet.querySelector(".gist-snippet-meta span.f6.color-fg-muted");
+      const fileCount = this._parseStat(snippet, /files?/i);
+      const description = this._cleanText(descEl?.textContent) ||
+        this._extractMetadata(snippet, "description") ||
+        `${this._fileLabel(fileCount)} on GitHub Gist`;
+      const isUserScript = /\.user\.js$/i.test(fileName);
+
+      return {
+        _source: "githubgist",
+        name: fileName,
+        description,
+        url: this.baseUrl + path,
+        code_url: isUserScript ? this._rawUrl(owner, id, fileName) : null,
+        version: this._extractMetadata(snippet, "version"),
+        license: null,
+        users: [{ name: owner }],
+        daily_installs: null,
+        total_installs: null,
+        good_ratings: this._parseStat(snippet, /stars?/i),
+        fan_score: null,
+        code_updated_at: updatedEl?.getAttribute("datetime") || null,
+        created_at: null,
+        _stars: this._parseStat(snippet, /stars?/i),
+        _forks: this._parseStat(snippet, /forks?/i),
+        _comments: this._parseStat(snippet, /comments?/i),
+        _files: fileCount,
+        _owner: owner,
+        _full_name: `${owner}/${id}`,
+        _topics: [fileName, "gist"].filter(Boolean)
+      };
+    }
+
+    _extractMetadata(snippet, key) {
+      const matcher = new RegExp(`@${key}\\s+([^\\n\\r<]+)`, "i");
+      const text = Array.from(snippet.querySelectorAll(".blob-code-inner, .blob-code"))
+        .map(el => this._cleanText(el.textContent))
+        .join("\n");
+      const match = text.match(matcher);
+      return match ? this._cleanText(match[1]) : null;
+    }
+
+    _parseStat(snippet, labelPattern) {
+      const stat = Array.from(snippet.querySelectorAll(".gist-snippet-meta li")).find(li =>
+        labelPattern.test(this._cleanText(li.textContent))
+      );
+      return this._parseNumber(stat?.textContent);
+    }
+
+    _parseNumber(text) {
+      const match = String(text || "").replace(/,/g, "").match(/(\d+(?:\.\d+)?)\s*([kKmM])?/);
+      if (!match) return null;
+      const multiplier = match[2]?.toLowerCase() === "m" ? 1000000 : match[2]?.toLowerCase() === "k" ? 1000 : 1;
+      return Number(match[1]) * multiplier;
+    }
+
+    _fileLabel(count) {
+      if (!count) return "Gist";
+      return `${count} ${count === 1 ? "file" : "files"}`;
+    }
+
+    _rawUrl(owner, id, fileName) {
+      return `https://gist.githubusercontent.com/${encodeURIComponent(owner)}/${id}/raw/${encodeURIComponent(fileName)}`;
+    }
+
+    _decodePathSegment(segment) {
+      if (!segment) return null;
+      try { return decodeURIComponent(segment.replace(/\+/g, "%20")); }
+      catch { return segment; }
+    }
+
+    _cleanText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
+
+    getDirectSearchUrl(domain) {
+      return `${this.baseUrl}/search?q=${encodeURIComponent(domain + ' userscript')}`;
+    }
+  }
+
   class ToastService {
     constructor(shadowRoot) { this.root = shadowRoot; this.el = null; this.timer = null; this.undoCallback = null; }
 
@@ -849,6 +1024,7 @@
 .sf-modal-header.openuserjs::before { background: linear-gradient(90deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}); }
 .sf-modal-header.chromewebstore::before { background: linear-gradient(90deg, ${THEME.chromewebstoreDim}, ${THEME.chromewebstore}); }
 .sf-modal-header.mozillaaddons::before { background: linear-gradient(90deg, ${THEME.mozillaaddonsDim}, ${THEME.mozillaaddons}); }
+.sf-modal-header.githubgist::before { background: linear-gradient(90deg, ${THEME.githubgistDim}, ${THEME.githubgist}); }
 .sf-modal-header.github::before { background: linear-gradient(90deg, ${THEME.github}, ${THEME.peach}); }
 
 .sf-header-row { display: flex; align-items: center; gap: 12px; }
@@ -896,6 +1072,7 @@
 .sf-search-box.openuserjs:focus-within { border-color: ${THEME.openuserjs}33; box-shadow: 0 0 0 3px ${THEME.openuserjs}11; }
 .sf-search-box.chromewebstore:focus-within { border-color: ${THEME.chromewebstore}44; box-shadow: 0 0 0 3px ${THEME.chromewebstore}11; }
 .sf-search-box.mozillaaddons:focus-within { border-color: ${THEME.mozillaaddons}44; box-shadow: 0 0 0 3px ${THEME.mozillaaddons}11; }
+.sf-search-box.githubgist:focus-within { border-color: ${THEME.githubgist}44; box-shadow: 0 0 0 3px ${THEME.githubgist}11; }
 .sf-search-box.github:focus-within { border-color: ${THEME.github}33; box-shadow: 0 0 0 3px ${THEME.github}11; }
 .sf-search-box svg { width: 14px; height: 14px; color: ${THEME.overlay}; flex-shrink: 0; }
 .sf-search-input {
@@ -944,6 +1121,11 @@
   color: ${THEME.mozillaaddons}; border-color: ${THEME.mozillaaddons}44;
   box-shadow: 0 0 16px ${THEME.glowMozillaAddons};
 }
+.sf-tab.githubgist.active {
+  background: linear-gradient(135deg, ${THEME.githubgistDim}44, ${THEME.githubgist}22);
+  color: ${THEME.githubgist}; border-color: ${THEME.githubgist}44;
+  box-shadow: 0 0 16px ${THEME.glowGitHubGist};
+}
 .sf-tab.github.active {
   background: linear-gradient(135deg, ${THEME.githubDim}44, ${THEME.github}22);
   color: ${THEME.github}; border-color: ${THEME.github}33;
@@ -969,6 +1151,7 @@
 .sf-sort-select.openuserjs:focus { border-color: ${THEME.openuserjs}44; }
 .sf-sort-select.chromewebstore:focus { border-color: ${THEME.chromewebstore}44; }
 .sf-sort-select.mozillaaddons:focus { border-color: ${THEME.mozillaaddons}44; }
+.sf-sort-select.githubgist:focus { border-color: ${THEME.githubgist}44; }
 .sf-sort-select.github:focus { border-color: ${THEME.github}44; }
 
 /* Content */
@@ -997,6 +1180,7 @@
 .sf-item.openuserjs:hover::after { background: linear-gradient(180deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}); }
 .sf-item.chromewebstore:hover::after { background: linear-gradient(180deg, ${THEME.chromewebstoreDim}, ${THEME.chromewebstore}); }
 .sf-item.mozillaaddons:hover::after { background: linear-gradient(180deg, ${THEME.mozillaaddonsDim}, ${THEME.mozillaaddons}); }
+.sf-item.githubgist:hover::after { background: linear-gradient(180deg, ${THEME.githubgistDim}, ${THEME.githubgist}); }
 .sf-item.github:hover::after { background: linear-gradient(180deg, ${THEME.github}, ${THEME.peach}); }
 .sf-item:last-child { border-bottom: none; }
 
@@ -1019,6 +1203,7 @@
 .sf-item.openuserjs .sf-script-title:hover { color: ${THEME.openuserjs}; }
 .sf-item.chromewebstore .sf-script-title:hover { color: ${THEME.chromewebstore}; }
 .sf-item.mozillaaddons .sf-script-title:hover { color: ${THEME.mozillaaddons}; }
+.sf-item.githubgist .sf-script-title:hover { color: ${THEME.githubgist}; }
 .sf-item.github .sf-script-title:hover { color: ${THEME.github}; }
 
 .sf-script-sub {
@@ -1046,6 +1231,8 @@
 .sf-item.chromewebstore .sf-install-btn:hover { background: ${THEME.chromewebstore}44; }
 .sf-item.mozillaaddons .sf-install-btn { background: ${THEME.mozillaaddons}22; color: ${THEME.mozillaaddons}; }
 .sf-item.mozillaaddons .sf-install-btn:hover { background: ${THEME.mozillaaddons}44; }
+.sf-item.githubgist .sf-install-btn { background: ${THEME.githubgist}22; color: ${THEME.githubgist}; }
+.sf-item.githubgist .sf-install-btn:hover { background: ${THEME.githubgist}44; }
 .sf-item.github .sf-install-btn { background: ${THEME.github}22; color: ${THEME.github}; }
 .sf-item.github .sf-install-btn:hover { background: ${THEME.github}44; }
 
@@ -1078,6 +1265,7 @@
 .sf-spinner.openuserjs { border-top-color: ${THEME.openuserjs}; }
 .sf-spinner.chromewebstore { border-top-color: ${THEME.chromewebstore}; }
 .sf-spinner.mozillaaddons { border-top-color: ${THEME.mozillaaddons}; }
+.sf-spinner.githubgist { border-top-color: ${THEME.githubgist}; }
 .sf-spinner.github { border-top-color: ${THEME.github}; }
 .sf-loading-text { font: 500 13px/1 inherit; color: ${THEME.subtext0}; }
 
@@ -1097,6 +1285,7 @@
 .sf-action-btn.openuserjs { background: linear-gradient(135deg, ${THEME.openuserjsDim}, ${THEME.openuserjs}88); }
 .sf-action-btn.chromewebstore { background: linear-gradient(135deg, ${THEME.chromewebstoreDim}, ${THEME.chromewebstore}88); }
 .sf-action-btn.mozillaaddons { background: linear-gradient(135deg, ${THEME.mozillaaddonsDim}, ${THEME.mozillaaddons}88); }
+.sf-action-btn.githubgist { background: linear-gradient(135deg, ${THEME.githubgistDim}, ${THEME.githubgist}88); }
 .sf-action-btn.github { background: linear-gradient(135deg, ${THEME.githubDim}, ${THEME.github}88); }
 
 /* Footer */
@@ -1113,6 +1302,7 @@
 .sf-footer a.openuserjs { color: ${THEME.openuserjs}; }
 .sf-footer a.chromewebstore { color: ${THEME.chromewebstore}; }
 .sf-footer a.mozillaaddons { color: ${THEME.mozillaaddons}; }
+.sf-footer a.githubgist { color: ${THEME.githubgist}; }
 .sf-footer a.github { color: ${THEME.github}; }
 
 /* Settings panel */
@@ -1168,6 +1358,7 @@
         openuserjs: new OpenUserJSScriptService(),
         chromewebstore: new ChromeWebStoreService(),
         mozillaaddons: new MozillaAddonsService(),
+        githubgist: new GitHubGistService(),
         github: new GitHubScriptService()
       };
       this.currentService = this.settings.get("lastService") || "greasyfork";
@@ -1233,6 +1424,7 @@
           <button class="sf-tab openuserjs" data-service="openuserjs">OpenUserJS</button>
           <button class="sf-tab chromewebstore" data-service="chromewebstore">Chrome</button>
           <button class="sf-tab mozillaaddons" data-service="mozillaaddons">Firefox</button>
+          <button class="sf-tab githubgist" data-service="githubgist">Gists</button>
           <button class="sf-tab github" data-service="github">GitHub</button>
         </div>
         <div class="sf-sort-bar">
@@ -1378,6 +1570,9 @@
       window._sfMenuIds.push(GM_registerMenuCommand(`Find Extensions for ${domain} (Mozilla AMO)`, () => {
         this._ensureUI(); this.currentService = "mozillaaddons"; this._open();
       }));
+      window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (GitHub Gists)`, () => {
+        this._ensureUI(); this.currentService = "githubgist"; this._open();
+      }));
       window._sfMenuIds.push(GM_registerMenuCommand(`Find Scripts for ${domain} (GitHub)`, () => {
         this._ensureUI(); this.currentService = "github"; this._open();
       }));
@@ -1419,7 +1614,7 @@
 
     _updateServiceColors() {
       const svc = this.currentService;
-      const svcNames = ["greasyfork", "sleazyfork", "openuserjs", "chromewebstore", "mozillaaddons", "github"];
+      const svcNames = ["greasyfork", "sleazyfork", "openuserjs", "chromewebstore", "mozillaaddons", "githubgist", "github"];
       const header = this.modal.querySelector(".sf-modal-header");
       svcNames.forEach(s => header.classList.toggle(s, s === svc));
       svcNames.forEach(s => this.sortSelect.classList.toggle(s, s === svc));
@@ -1428,8 +1623,8 @@
       const footerLink = this.modal.querySelector(".sf-footer a");
       if (footerLink) {
         svcNames.forEach(s => footerLink.classList.toggle(s, s === svc));
-        const labels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", github: "GitHub" };
-        const urls = { greasyfork: "https://greasyfork.org", sleazyfork: "https://sleazyfork.org", openuserjs: "https://openuserjs.org", chromewebstore: "https://chromewebstore.google.com", mozillaaddons: "https://addons.mozilla.org", github: "https://github.com" };
+        const labels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", githubgist: "GitHub Gists", github: "GitHub" };
+        const urls = { greasyfork: "https://greasyfork.org", sleazyfork: "https://sleazyfork.org", openuserjs: "https://openuserjs.org", chromewebstore: "https://chromewebstore.google.com", mozillaaddons: "https://addons.mozilla.org", githubgist: "https://gist.github.com", github: "https://github.com" };
         footerLink.textContent = labels[svc];
         footerLink.href = urls[svc];
       }
@@ -1438,7 +1633,7 @@
     _setResultCount(count) {
       const countEl = this.modal.querySelector(".sf-subtitle-count");
       const textEl = this.modal.querySelector(".sf-subtitle-text");
-      const units = { github: "repo", chromewebstore: "extension", mozillaaddons: "extension" };
+      const units = { github: "repo", githubgist: "gist", chromewebstore: "extension", mozillaaddons: "extension" };
       const unit = units[this.currentService] || "script";
       if (countEl) countEl.textContent = count || 0;
       if (textEl) textEl.textContent = count === 1 ? `${unit} found` : `${unit}s found`;
@@ -1450,7 +1645,7 @@
       this.isLoading = true;
       const svc = this.services[this.currentService];
       const svcClass = this.currentService === "greasyfork" ? "" : this.currentService;
-      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", github: "GitHub" };
+      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", githubgist: "GitHub Gists", github: "GitHub" };
       const svcLabel = svcLabels[this.currentService];
 
       _safeHTML(this.content, `<div class="sf-loading"><div class="sf-spinner ${svcClass}"></div><div class="sf-loading-text">Searching ${svcLabel}...</div></div>`);
@@ -1492,12 +1687,12 @@
     _displayScripts() {
       let scripts = this.allScripts || [];
       const svcClass = this.currentService === "greasyfork" ? "" : this.currentService;
-      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", github: "GitHub" };
+      const svcLabels = { greasyfork: "GreasyFork", sleazyfork: "SleazyFork", openuserjs: "OpenUserJS", chromewebstore: "Chrome Web Store", mozillaaddons: "Mozilla Add-ons", githubgist: "GitHub Gists", github: "GitHub" };
       const svcLabel = svcLabels[this.currentService];
       const displayHost = HostService.extractRootDomain(this.currentDomain);
 
       // Update title
-      const titleType = ["chromewebstore", "mozillaaddons"].includes(this.currentService) ? "Extensions" : "Scripts";
+      const titleType = this.currentService === "githubgist" ? "Gists" : ["chromewebstore", "mozillaaddons"].includes(this.currentService) ? "Extensions" : "Scripts";
       this.modal.querySelector(".sf-modal-title").textContent = `${titleType} for ${displayHost}`;
 
       // Filter by search
@@ -1548,6 +1743,7 @@
       const isGH = script._source === "github";
       const isCWS = script._source === "chromewebstore";
       const isAMO = script._source === "mozillaaddons";
+      const isGist = script._source === "githubgist";
       const daily = formatNumber(script.daily_installs);
       const total = formatNumber(script.total_installs);
       const good = formatNumber(script.good_ratings);
@@ -1557,7 +1753,7 @@
       const created = relativeTime(script.created_at);
       const author = script.users?.[0]?.name || null;
       const baseUrls = { sleazyfork: "https://sleazyfork.org", greasyfork: "https://greasyfork.org", openuserjs: "https://openuserjs.org" };
-      const scriptUrl = isGH ? script.url : (script.url?.startsWith("http") ? script.url : (baseUrls[svcClass] || baseUrls.greasyfork) + (script.url || ""));
+      const scriptUrl = (isGH || isGist) ? script.url : (script.url?.startsWith("http") ? script.url : (baseUrls[svcClass] || baseUrls.greasyfork) + (script.url || ""));
       const installUrl = script.code_url || null;
 
       const fanClass = fanScore >= 8 ? "score-high" : fanScore >= 6 ? "score-mid" : fanScore >= 0 ? "score-low" : "";
@@ -1579,6 +1775,16 @@
           ${lang ? badge("gitBranch", lang, "Language") : ""}
           ${badge("clockwise", updated, "Updated")}
           ${badge("calendarPlus", created, "Created")}
+        `;
+      } else if (isGist) {
+        const stars = formatNumber(script._stars);
+        const forks = formatNumber(script._forks);
+        const files = script._files ? `${script._files} ${script._files === 1 ? "file" : "files"}` : null;
+        metaHtml = `
+          ${badge("gitBranch", files, "Files")}
+          ${badge("star", stars, "Stars")}
+          ${badge("gitFork", forks, "Forks")}
+          ${badge("clockwise", updated, "Last active")}
         `;
       } else if (isCWS || isAMO) {
         const totalUsers = formatNumber(script.total_installs);
@@ -1603,9 +1809,9 @@
 
       // Non-userscript sources get a "View" button; script registries get "Install".
       let actionBtn;
-      if (isGH || isCWS || isAMO) {
-        const icon = isGH ? "githubLogo" : "search";
-        const title = isGH ? "View repository" : "View extension";
+      if (isGH || isCWS || isAMO || (isGist && !installUrl)) {
+        const icon = (isGH || isGist) ? "githubLogo" : "search";
+        const title = isGH ? "View repository" : isGist ? "View gist" : "View extension";
         actionBtn = `<button class="sf-install-btn" data-url="${escapeHtml(scriptUrl)}" title="${title}">${getIcon(icon)} View</button>`;
       } else if (installUrl) {
         actionBtn = `<button class="sf-install-btn" data-url="${escapeHtml(installUrl)}" title="Install script">${getIcon('install')} Install</button>`;
@@ -1618,7 +1824,7 @@
           <div class="sf-script-info">
             <a href="${escapeHtml(scriptUrl)}" target="_blank" class="sf-script-title" title="${escapeHtml(script.name || '')}">${escapeHtml(script.name || "Untitled")}</a>
             <div class="sf-script-sub">
-              ${author ? `<span title="${isGH ? 'Owner' : 'Author'}">${getIcon('user')} ${escapeHtml(author)}</span>` : ""}
+              ${author ? `<span title="${isGH || isGist ? 'Owner' : 'Author'}">${getIcon('user')} ${escapeHtml(author)}</span>` : ""}
               ${author && script.version ? `<span class="sf-dot">&bull;</span>` : ""}
               ${script.version ? `<span title="Version">${getIcon('gitBranch')} v${escapeHtml(script.version)}</span>` : ""}
               ${(author || script.version) && script.license ? `<span class="sf-dot">&bull;</span>` : ""}

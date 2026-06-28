@@ -5,14 +5,14 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.4.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-WTFPL-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
 </p>
 
 <p align="center">
-  Discover userscripts and extension alternatives for any website — searches GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, and GitHub from one place.
+  Discover userscripts and extension alternatives for any website — searches GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, GitHub Gists, and GitHub from one place.
 </p>
 
 ---
@@ -36,6 +36,7 @@ Click your userscript manager icon on any website and pick a source to search:
 │  ⚙ Find Scripts for reddit.com (OpenUserJS)             │
 │  ⚙ Find Extensions for reddit.com (Chrome Web Store)    │
 │  ⚙ Find Extensions for reddit.com (Mozilla AMO)          │
+│  ⚙ Find Scripts for reddit.com (GitHub Gists)            │
 │  ⚙ Find Scripts for reddit.com (GitHub)                 │
 │  ⚙ Reset Script Finder Settings                         │
 └─────────────────────────────────────────────────────────┘
@@ -46,7 +47,8 @@ Click your userscript manager icon on any website and pick a source to search:
 │  47 scripts found                                       │
 │                                                         │
 │  [GreasyFork] [SleazyFork] [OpenUserJS]                  │
-│  [Chrome]    [Firefox]    [GitHub]                       │
+│  [Chrome]    [Firefox]    [Gists]                        │
+│  [GitHub]                                                │
 │                                                         │
 │  🔍 Filter scripts...                                   │
 │  Sort by: Daily installs ▾                              │
@@ -65,11 +67,11 @@ Click your userscript manager icon on any website and pick a source to search:
 
 | Feature | Description |
 |---------|-------------|
-| **Six Sources** | Search GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, and GitHub from a single interface |
-| **One-Click Install** | Install scripts directly from GreasyFork/SleazyFork without leaving the page |
+| **Seven Sources** | Search GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, GitHub Gists, and GitHub from a single interface |
+| **One-Click Install** | Install scripts directly from registries and `.user.js` Gists without leaving the page |
 | **Live Search Filter** | Real-time filtering within results with match count (e.g., `12/47`) |
 | **Smart Sorting** | Sort by daily installs, total installs, ratings, fan score, last update, or creation date |
-| **GitHub Integration** | Searches repos matching `{domain} userscript/tampermonkey/greasemonkey`, shows stars and forks |
+| **GitHub Integration** | Searches repos and Gists matching `{domain} userscript/tampermonkey/greasemonkey`, shows stars and forks |
 | **Dense Mode** | Toggle compact view — hides descriptions and tightens padding for fast scanning |
 | **Relative Timestamps** | Shows `3d ago`, `2mo ago`, `just now` instead of raw ISO dates |
 | **Inline Settings** | Gear icon opens settings within the modal — no external menus to navigate |
@@ -87,6 +89,7 @@ Click your userscript manager icon on any website and pick a source to search:
 | **OpenUserJS** | `/?q={domain}` HTML search | OpenUserJS scripts matching the current domain | Installs, ratings, last update |
 | **Chrome Web Store** | `/search/{domain}` embedded result data | Chrome extensions matching the current domain | Users, rating, rating count, last update |
 | **Mozilla AMO** | `/api/v5/addons/search/` | Firefox extensions matching the current domain | Users, rating, rating count, last update |
+| **GitHub Gists** | `gist.github.com/search` HTML search | Gists matching `{domain} userscript` | Files, stars, forks, last active |
 | **GitHub** | `api.github.com/search/repositories` | Repos matching `{domain} userscript` | Stars, forks, language |
 
 > **Note:** GitHub's unauthenticated API is rate-limited to ~10 requests/minute. Results are cached per your cache duration setting. If you hit the limit, wait a minute and try again.
@@ -112,6 +115,7 @@ Dark OLED-only interface using the **Catppuccin Mocha** palette with glassmorphi
 | OpenUserJS | Blue |
 | Chrome Web Store | Yellow |
 | Mozilla AMO | Orange |
+| GitHub Gists | Flamingo |
 | GitHub | Orange / Peach |
 
 ## Color-Coded Fan Scores
