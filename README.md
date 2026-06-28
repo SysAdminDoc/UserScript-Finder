@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.5.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.6.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-WTFPL-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -71,7 +71,7 @@ Click your userscript manager icon on any website and pick a source to search:
 | **Eight Sources** | Search GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, curated catalogs, GitHub Gists, and GitHub from a single interface |
 | **One-Click Install** | Install scripts directly from registries and `.user.js` Gists without leaving the page |
 | **Live Search Filter** | Real-time filtering within results with match count (e.g., `12/47`) |
-| **Smart Sorting** | Sort by daily installs, total installs, ratings, fan score, last update, or creation date |
+| **Smart Sorting** | Sort by daily installs, total installs, ratings, fan score, author reputation, last update, or creation date |
 | **Curated Catalogs** | Searches Awesome Userscripts and Tampermonkey's Userscript.Zone handoff for domain-matched recommendations |
 | **GitHub Integration** | Searches repos and Gists matching `{domain} userscript/tampermonkey/greasemonkey`, shows stars and forks |
 | **Dense Mode** | Toggle compact view — hides descriptions and tightens padding for fast scanning |
@@ -104,7 +104,7 @@ Access via the ⚙ gear icon in the modal header:
 | Setting | Options | Default |
 |---------|---------|---------|
 | Dense Mode | On / Off | Off |
-| Default Sort | Daily installs, Total installs, Ratings, Fan score, Last update, Created | Daily installs |
+| Default Sort | Daily installs, Total installs, Ratings, Fan score, Author reputation, Last update, Created | Daily installs |
 | Cache Duration | 1, 5, 10, 30 minutes | 5 minutes |
 
 ## Theme

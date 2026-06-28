@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.5.0
+// @version      1.6.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -161,6 +161,16 @@
     if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.0', '') + 'M';
     if (n >= 1000) return (n / 1000).toFixed(1).replace('.0', '') + 'k';
     return n.toString();
+  }
+
+  function reputationScore(script) {
+    const installs = Number(script?.total_installs) || 0;
+    const ratings = Number(script?.good_ratings ?? script?._rating_count ?? script?._stars) || 0;
+    const quality = Number(script?.fan_score ?? script?._rating) || 0;
+    const stars = Number(script?._stars) || 0;
+    const forks = Number(script?._forks) || 0;
+    const curated = script?._catalog_source === "Awesome Userscripts" ? 100000 : script?._catalog_source ? 30000 : 0;
+    return curated + (Math.log10(installs + 1) * 1000) + (ratings * 10) + (quality * 250) + (stars * 15) + (forks * 25);
   }
 
   // ── Settings Service ────────────────────────────────────────────────
@@ -1639,6 +1649,7 @@
             <option value="total">Total installs</option>
             <option value="good">Ratings</option>
             <option value="fanscore">Fan score</option>
+            <option value="authorrep">Author reputation</option>
             <option value="updatedate">Last update</option>
             <option value="createdate">Created</option>
           </select>
@@ -1662,6 +1673,7 @@
               <option value="total" ${this.settings.get('defaultSort')==='total'?'selected':''}>Total installs</option>
               <option value="good" ${this.settings.get('defaultSort')==='good'?'selected':''}>Ratings</option>
               <option value="fanscore" ${this.settings.get('defaultSort')==='fanscore'?'selected':''}>Fan score</option>
+              <option value="authorrep" ${this.settings.get('defaultSort')==='authorrep'?'selected':''}>Author reputation</option>
               <option value="updatedate" ${this.settings.get('defaultSort')==='updatedate'?'selected':''}>Last update</option>
               <option value="createdate" ${this.settings.get('defaultSort')==='createdate'?'selected':''}>Created</option>
             </select>
@@ -1886,6 +1898,7 @@
         case "total": return copy.sort((a,b) => (b.total_installs || b._stars || 0) - (a.total_installs || a._stars || 0));
         case "good": return copy.sort((a,b) => (b.good_ratings || b._rating || 0) - (a.good_ratings || a._rating || 0));
         case "fanscore": return copy.sort((a,b) => (b.fan_score || b._forks || 0) - (a.fan_score || a._forks || 0));
+        case "authorrep": return copy.sort((a,b) => reputationScore(b) - reputationScore(a));
         case "updatedate": return copy.sort((a,b) => new Date(b.code_updated_at||0) - new Date(a.code_updated_at||0));
         case "createdate": return copy.sort((a,b) => new Date(b.created_at||0) - new Date(a.created_at||0));
         default: return copy.sort((a,b) => (b.daily_installs || b.total_installs || b._stars || 0) - (a.daily_installs || a.total_installs || a._stars || 0));
