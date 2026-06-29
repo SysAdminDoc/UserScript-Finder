@@ -143,3 +143,82 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
   Touches: adapter registry structure, source metadata object, README contributor section.
   Acceptance: Adding a source requires one adapter registration plus parser tests, with labels/accent/menu/tab behavior generated from metadata.
   Complexity: L
+
+## Research-Driven Additions
+
+- [ ] P0 - Reconcile ROADMAP.md with shipped work
+  Why: `ROADMAP.md` still lists shipped v1.8.1-v1.15.0 work, which can cause future agents to duplicate completed implementation.
+  Evidence: `CHANGELOG.md` v1.8.1-v1.15.0; `ROADMAP.md` existing Research-Driven Additions.
+  Touches: `ROADMAP.md`
+  Acceptance: Completed rows already shipped in `CHANGELOG.md` are deleted; remaining rows describe only incomplete work.
+  Complexity: S
+
+- [ ] P1 - Add sensitive-host no-fetch rules
+  Why: Per-source privacy controls do not stop all network discovery on sensitive hosts such as banks, identity pages, localhost, admin consoles, or user-defined domains.
+  Evidence: Magic Userscript+ blacklist feature; `UserScript-Finder.user.js` `@match *://*/*`, `SettingsService`, `ScriptFinder._loadScripts`.
+  Touches: `SettingsService`, menu registration, settings UI, `HostService`, source loading guards, README privacy/settings docs, tests.
+  Acceptance: Built-in and user-defined host patterns suppress source menus/tabs/fetches on matching pages, show a local-only disabled notice, and can be overridden intentionally.
+  Complexity: M
+
+- [ ] P1 - Post-filter root-domain results with metadata coverage
+  Why: Registry by-site APIs often fall back to root domains, making subdomain-specific searches noisy unless candidate `@match`/`@include` metadata is checked.
+  Evidence: Magic Userscript+ issue #68; `UserScript-Finder.user.js` `ScriptService.searchScriptsByHost`, `ScriptService._filter`, `MatchCoverage`.
+  Touches: `ScriptService`, `MatchCoverage`, source runtime/cache, result notices, adapter fixtures.
+  Acceptance: When exact-host GreasyFork/SleazyFork lookup falls back to root domain, candidates with install URLs are metadata-checked and labeled exact, broad, or uncertain before display.
+  Complexity: M
+
+- [ ] P1 - Show extension permission and privacy badges
+  Why: Extension alternatives can be higher risk than userscripts; AMO and store pages expose permissions, host permissions, privacy policies, data-collection signals, and promoted status that are currently discarded.
+  Evidence: Mozilla Add-ons API search response; Chrome Web Store/Edge Add-ons store metadata; `ChromeWebStoreService`, `MozillaAddonsService`.
+  Touches: store adapters, result normalization, badge rendering, sorting/trust helpers, adapter fixtures, README source table.
+  Acceptance: Chrome/Firefox extension results display concise permission/privacy/trust badges and warn on `<all_urls>`, broad host access, missing privacy policy, or stale update dates.
+  Complexity: M
+
+- [ ] P1 - Add manager compatibility and degraded-mode checks
+  Why: README claims Tampermonkey, Violentmonkey, and Greasemonkey support, but manager APIs and strict CSP/Trusted Types behavior vary across managers and browsers.
+  Evidence: Magic Userscript+ known issues and https://github.com/magicoflolis/Userscript-Plus/issues/71; https://github.com/Tampermonkey/tampermonkey/issues/2800; https://github.com/Tampermonkey/tampermonkey/issues/2814; `UserScript-Finder.user.js` GM API use and Trusted Types policy.
+  Touches: boot capability checks, diagnostics payload, README compatibility matrix, tests for missing/partial GM APIs.
+  Acceptance: Missing or partial GM APIs produce actionable in-modal diagnostics; README lists verified manager/browser behavior and degraded paths.
+  Complexity: M
+
+- [ ] P2 - Sync settings across tabs
+  Why: Changing source/privacy/sort settings in one tab does not update existing menus or modals in other tabs until reload.
+  Evidence: Find Scripts For This Site uses `GM_addValueChangeListener` with fallback sync; `SettingsService.saveSettings`, `ScriptFinder._registerMenus`.
+  Touches: userscript grants, `SettingsService`, menu re-registration, settings UI, source privacy tests.
+  Acceptance: Settings changes propagate to other open tabs through `GM_addValueChangeListener` when available and polling fallback otherwise.
+  Complexity: S
+
+- [ ] P2 - Add ScriptCat as an optional discovery source
+  Why: ScriptCat is a current userscript manager/repository and direct competitors search it alongside Greasy Fork/OpenUserJS/GitHub.
+  Evidence: Find Scripts For This Site README; `scriptscat/scriptcat`; existing source adapter registry.
+  Touches: source metadata, new ScriptCat adapter, install/view URL validation, fixtures, tabs/menu labels, README source table.
+  Acceptance: ScriptCat results appear in an optional tab/menu, normalize into the shared result shape, respect source privacy toggles, and have parser fixtures.
+  Complexity: M
+
+- [ ] P2 - Add fielded result filtering
+  Why: The current text filter and fixed date/rating/language controls cannot express common power-user filters such as author, license, source, URL, locale, or installability.
+  Evidence: Magic Userscript+ `author:`, `license:`, `locale:`, `url:`, `engine:` filter grammar; `UserScript-Finder.user.js` `_displayScripts`.
+  Touches: search parser helper, filter UI microcopy, result filter tests, README feature docs.
+  Acceptance: Users can type documented field filters that combine with existing sort/date/rating/language controls without breaking plain text search.
+  Complexity: M
+
+- [ ] P2 - Add source-specific domain and keyword query modes
+  Why: Some sources are strong at domain lookup while others need keyword queries; users need a manual escape when root-domain fallback is too broad or exact host is too narrow.
+  Evidence: Find Scripts For This Site domain/keyword toggles; https://github.com/magicoflolis/Userscript-Plus/issues/61; current adapter `getDirectSearchUrl` methods.
+  Touches: source metadata, query construction, modal controls, direct-search links, settings persistence, tests.
+  Acceptance: Each source exposes supported query modes such as exact host, root domain, keyword, or all-site keyword, and the active mode is visible and persisted.
+  Complexity: M
+
+- [ ] P2 - Add a portable local test runner manifest
+  Why: Browser-backed tests pass locally but hardcode a machine-local node_modules path, making contributor verification non-portable.
+  Evidence: `tests/*.test.cjs` runtime path setup; missing `package.json`.
+  Touches: `package.json`, test bootstrap helper, `.gitignore`, README verification docs, all `.cjs` tests.
+  Acceptance: `npm test` runs every local test on a clean clone after `npm install`, with Playwright dependency resolution centralized in one helper.
+  Complexity: S
+
+- [ ] P2 - Chunk large result rendering
+  Why: Source adapters can return up to 200 rows, and rendering all rows with animations in one synchronous pass risks modal jank on slower pages.
+  Evidence: `ScriptService._filter` slice limit, Magic Userscript+ load-time improvements, https://developer.mozilla.org/en-US/docs/Web/API/Prioritized_Task_Scheduling_API.
+  Touches: `ScriptFinder._displayScripts`, result count/live region updates, dense mode rendering, browser smoke tests.
+  Acceptance: Large result sets render in measured chunks or a virtualized list, keep the modal responsive, and preserve keyboard/focus behavior.
+  Complexity: M
