@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.16.0
+// @version      1.17.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -701,10 +701,14 @@
     }
 
     async searchScriptsByHost(host, settings) {
-      let scripts = await this._searchWithDomain(host, settings);
+      const exactHost = HostService.normalizeHost(host);
+      let scripts = await this._searchWithDomain(exactHost, settings);
       if (scripts.length === 0) {
-        const root = HostService.extractRootDomain(host);
-        if (root !== host) scripts = await this._searchWithDomain(root, settings);
+        const root = HostService.extractRootDomain(exactHost);
+        if (root !== exactHost) {
+          const fallback = await this._searchWithDomain(root, settings);
+          scripts = await this._labelRootFallbackCoverage(fallback, exactHost, root);
+        }
       }
       return scripts;
     }
@@ -753,6 +757,61 @@
           d.replace('*.','').includes(domain)
         );
       }).slice(0, 200);
+    }
+
+    async _labelRootFallbackCoverage(scripts, exactHost, rootHost) {
+      if (!Array.isArray(scripts) || !scripts.length) return scripts;
+      const labeled = await Promise.all(scripts.map(script => this._withRootFallbackCoverage(script, exactHost)));
+      const counts = labeled.reduce((acc, script) => {
+        acc[script._hostCoverage || "uncertain"] = (acc[script._hostCoverage || "uncertain"] || 0) + 1;
+        return acc;
+      }, {});
+      return SourceRuntime.withStatus(labeled, {
+        type: "partial",
+        title: "Root-domain fallback checked",
+        detail: `No exact-host results for ${exactHost}; showing ${rootHost} results labeled by metadata coverage (${counts.exact || 0} exact, ${counts.broad || 0} broad, ${counts.uncertain || 0} uncertain).`,
+        checkedAt: Date.now()
+      });
+    }
+
+    async _withRootFallbackCoverage(script, exactHost) {
+      const copy = { ...script };
+      const install = copy.code_url ? InstallSafety.validateInstallUrl(copy, copy.code_url) : null;
+      if (!install?.ok) {
+        return this._setHostCoverage(copy, "uncertain", "Coverage uncertain", install?.reason || "No install URL available for metadata coverage.");
+      }
+      try {
+        const source = await SourceRuntime.requestText(install.url, {
+          source: SourceRuntime.label(this),
+          headers: { Accept: "text/plain,*/*" },
+          notFound: ""
+        });
+        const coverage = MatchCoverage.evaluate(source, exactHost, this._currentUrlForHost(exactHost));
+        copy._matchPreview = coverage;
+        if (coverage.status === "good") return this._setHostCoverage(copy, "exact", "Exact host", coverage.title);
+        if (coverage.status === "bad") return this._setHostCoverage(copy, "broad", "Broad/root match", coverage.title);
+        return this._setHostCoverage(copy, "uncertain", "Coverage uncertain", coverage.title);
+      } catch(err) {
+        return this._setHostCoverage(copy, "uncertain", "Coverage uncertain", err?.message || "Metadata coverage check failed.");
+      }
+    }
+
+    _setHostCoverage(script, kind, label, detail) {
+      script._hostCoverage = kind;
+      script._hostCoverageLabel = label;
+      script._hostCoverageDetail = detail;
+      script._hostCoverageClass = kind === "exact" ? "coverage-exact" : kind === "broad" ? "coverage-broad" : "coverage-uncertain";
+      return script;
+    }
+
+    _currentUrlForHost(host) {
+      try {
+        const current = new URL(window.location.href);
+        current.hostname = host;
+        return current.href;
+      } catch {
+        return `https://${host}/`;
+      }
     }
 
     getDirectSearchUrl(domain) { return `${this.baseUrl}/scripts/by-site/${domain}`; }
@@ -2008,6 +2067,9 @@
 .sf-badge.score-high { background: ${THEME.green}18; color: ${THEME.green}; border-color: ${THEME.green}33; }
 .sf-badge.score-mid { background: ${THEME.yellow}18; color: ${THEME.yellow}; border-color: ${THEME.yellow}33; }
 .sf-badge.score-low { background: ${THEME.red}18; color: ${THEME.red}; border-color: ${THEME.red}33; }
+.sf-badge.coverage-exact { background: ${THEME.green}18; color: ${THEME.green}; border-color: ${THEME.green}33; }
+.sf-badge.coverage-broad { background: ${THEME.yellow}18; color: ${THEME.yellow}; border-color: ${THEME.yellow}33; }
+.sf-badge.coverage-uncertain { background: ${THEME.surface2}; color: ${THEME.subtext1}; border-color: ${THEME.glassBorder}; }
 
 /* Loading / empty / error */
 .sf-loading { padding: 50px 20px; text-align: center; display: grid; gap: 14px; place-items: center; }
@@ -3175,6 +3237,7 @@
           ${badge("chartBar", total, "Total installs")}
           ${badge("star", good, "Ratings")}
           ${badge("flame", fanText, "Fan score", fanText ? fanClass : "")}
+          ${badge("search", script._hostCoverageLabel, script._hostCoverageDetail || "Host coverage", script._hostCoverageClass || "")}
           ${badge("clockwise", updated, "Updated")}
           ${badge("calendarPlus", created, "Created")}
         `;

@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.17.0] - 2026-06-29
+
+- Added root-domain fallback coverage labels for GreasyFork/SleazyFork results by checking raw userscript metadata and marking exact, broad/root, or uncertain host coverage.
+
 ## [v1.16.0] - 2026-06-29
 
 - Added sensitive-host protection that suppresses source menus, tabs, and network fetches on built-in or user-defined sensitive hosts, plus a per-host override flow and browser-backed coverage.

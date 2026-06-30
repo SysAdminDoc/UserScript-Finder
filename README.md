@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.16.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.17.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -78,6 +78,7 @@ Click your userscript manager icon on any website and pick a source to search:
 | **Source Privacy Controls** | Lets users disable individual sources so those sources disappear from menus/tabs and make no network requests until re-enabled |
 | **Sensitive Host Protection** | Blocks source menus and network searches on built-in sensitive hosts such as banks, government, identity, admin, localhost, and local-network pages, with per-host override controls |
 | **Match Coverage Preview** | Fetches raw userscript metadata and compares `@match` / `@include` / `@exclude` rules against the current page, including scheme, host, path, wildcard, and exclude precedence |
+| **Root Fallback Coverage Labels** | When GreasyFork/SleazyFork fall back from exact host to root domain, installable results are labeled Exact host, Broad/root match, or Coverage uncertain from raw metadata |
 | **Smart Sorting** | Sort by daily installs, total installs, ratings, fan score, author reputation, last update, or creation date |
 | **Curated Catalogs** | Searches Awesome Userscripts and Tampermonkey's Userscript.Zone handoff for domain-matched recommendations |
 | **GitHub Integration** | Searches repos and Gists matching `{domain} userscript/tampermonkey/greasemonkey`, shows stars and forks |

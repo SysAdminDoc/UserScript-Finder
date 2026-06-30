@@ -97,13 +97,6 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
 
 ## Research-Driven Additions
 
-- [ ] P1 - Post-filter root-domain results with metadata coverage
-  Why: Registry by-site APIs often fall back to root domains, making subdomain-specific searches noisy unless candidate `@match`/`@include` metadata is checked.
-  Evidence: Magic Userscript+ issue #68; `UserScript-Finder.user.js` `ScriptService.searchScriptsByHost`, `ScriptService._filter`, `MatchCoverage`.
-  Touches: `ScriptService`, `MatchCoverage`, source runtime/cache, result notices, adapter fixtures.
-  Acceptance: When exact-host GreasyFork/SleazyFork lookup falls back to root domain, candidates with install URLs are metadata-checked and labeled exact, broad, or uncertain before display.
-  Complexity: M
-
 - [ ] P1 - Show extension permission and privacy badges
   Why: Extension alternatives can be higher risk than userscripts; AMO and store pages expose permissions, host permissions, privacy policies, data-collection signals, and promoted status that are currently discarded.
   Evidence: Mozilla Add-ons API search response; Chrome Web Store/Edge Add-ons store metadata; `ChromeWebStoreService`, `MozillaAddonsService`.
