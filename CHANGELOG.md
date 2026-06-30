@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.19.0] - 2026-06-30
+
+- Added runtime manager compatibility checks, degraded-mode reports, Trusted Types duplicate-policy fallback, GM API-safe settings/request/open wrappers, and browser-backed tests for missing GM network/menu capabilities.
+
 ## [v1.18.0] - 2026-06-30
 
 - Added extension trust badges for Chrome Web Store and Mozilla AMO results, including permission counts, broad host-access warnings, privacy policy signals, data-collection flags, promoted status, and stale-update warnings.

@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.18.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.19.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -87,6 +87,7 @@ Click your userscript manager icon on any website and pick a source to search:
 | **Relative Timestamps** | Shows `3d ago`, `2mo ago`, `just now` instead of raw ISO dates |
 | **Inline Settings** | Gear icon opens settings within the modal — no external menus to navigate |
 | **Accessible Modal** | Uses dialog semantics, live result announcements, accessible control names, focus entry/restoration, and contained Tab navigation |
+| **Manager Compatibility Checks** | Detects missing GM menu, network, storage, tab, and Trusted Types capabilities at runtime and shows an actionable degraded-mode report instead of failing silently |
 | **Persistent Preferences** | Remembers your last-used source, sort order, dense mode, and cache duration |
 | **Domain-Aware** | Automatically detects the current site and strips `www.`/`m.`/`mobile.` prefixes |
 | **Public-Suffix Aware Matching** | Normalizes common multi-label and hosted suffixes such as `co.uk`, `com.au`, `github.io`, `pages.dev`, and `netlify.app` before root-domain fallback |
@@ -147,11 +148,13 @@ Dark OLED-only interface using the **Catppuccin Mocha** palette with glassmorphi
 
 | Userscript Manager | Status |
 |--------------------|--------|
-| Tampermonkey | Fully supported |
-| Violentmonkey | Fully supported |
-| Greasemonkey | Supported |
+| Tampermonkey | Supported; runtime checks validate menu, network, storage, tab-open, and Trusted Types behavior |
+| Violentmonkey | Supported; runtime checks validate the same GM API surface |
+| Greasemonkey / partial managers | Degraded; if required `GM_registerMenuCommand` or `GM_xmlhttpRequest` is missing, Script Finder shows a compatibility report instead of running source fetches |
 
 Works on all websites (`*://*/*`). Runs at `document-idle` with zero overhead until activated — the UI is built lazily on first menu click.
+
+If non-critical APIs such as storage, tab opening, menu unregistering, or Trusted Types policy creation are unavailable, the modal shows a degraded-mode notice and diagnostics include the exact missing capability.
 
 ## Related Tools
 

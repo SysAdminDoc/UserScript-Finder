@@ -97,13 +97,6 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
 
 ## Research-Driven Additions
 
-- [ ] P1 - Add manager compatibility and degraded-mode checks
-  Why: README claims Tampermonkey, Violentmonkey, and Greasemonkey support, but manager APIs and strict CSP/Trusted Types behavior vary across managers and browsers.
-  Evidence: Magic Userscript+ known issues and https://github.com/magicoflolis/Userscript-Plus/issues/71; https://github.com/Tampermonkey/tampermonkey/issues/2800; https://github.com/Tampermonkey/tampermonkey/issues/2814; `UserScript-Finder.user.js` GM API use and Trusted Types policy.
-  Touches: boot capability checks, diagnostics payload, README compatibility matrix, tests for missing/partial GM APIs.
-  Acceptance: Missing or partial GM APIs produce actionable in-modal diagnostics; README lists verified manager/browser behavior and degraded paths.
-  Complexity: M
-
 - [ ] P2 - Sync settings across tabs
   Why: Changing source/privacy/sort settings in one tab does not update existing menus or modals in other tabs until reload.
   Evidence: Find Scripts For This Site uses `GM_addValueChangeListener` with fallback sync; `SettingsService.saveSettings`, `ScriptFinder._registerMenus`.

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.18.0
+// @version      1.19.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -39,9 +39,31 @@
   try { if (window.self !== window.top) return; } catch(e) { return; }
 
   // ── TrustedHTML policy ──────────────────────────────────────────────
-  const _ttPolicy = (typeof trustedTypes !== 'undefined' && trustedTypes.createPolicy)
-    ? trustedTypes.createPolicy('gf-script-finder', { createHTML: s => s })
-    : { createHTML: s => s };
+  const COMPAT_STATE = {
+    trustedTypes: { status: "unavailable", policyName: null, error: null }
+  };
+
+  function _createTrustedTypesPolicy() {
+    const fallback = { createHTML: s => s };
+    if (typeof trustedTypes === "undefined" || typeof trustedTypes.createPolicy !== "function") return fallback;
+    try {
+      const policy = trustedTypes.createPolicy("gf-script-finder", { createHTML: s => s });
+      COMPAT_STATE.trustedTypes = { status: "ok", policyName: "gf-script-finder", error: null };
+      return policy;
+    } catch(firstErr) {
+      const alternateName = `gf-script-finder-${Date.now().toString(36)}`;
+      try {
+        const policy = trustedTypes.createPolicy(alternateName, { createHTML: s => s });
+        COMPAT_STATE.trustedTypes = { status: "renamed", policyName: alternateName, error: firstErr?.message || "base policy unavailable" };
+        return policy;
+      } catch(secondErr) {
+        COMPAT_STATE.trustedTypes = { status: "fallback", policyName: null, error: secondErr?.message || firstErr?.message || "policy unavailable" };
+        return fallback;
+      }
+    }
+  }
+
+  const _ttPolicy = _createTrustedTypesPolicy();
   function _safeHTML(el, html) { el.innerHTML = _ttPolicy.createHTML(html); }
 
   const SOURCE_META = {
@@ -418,6 +440,92 @@
     return badges;
   }
 
+  function gmFunction(name) {
+    const fn = globalThis?.[name];
+    return typeof fn === "function" ? fn : null;
+  }
+
+  function gmGetValue(key, fallback) {
+    const fn = gmFunction("GM_getValue");
+    if (!fn) return fallback;
+    try { return fn(key, fallback); }
+    catch { return fallback; }
+  }
+
+  function gmSetValue(key, value) {
+    const fn = gmFunction("GM_setValue");
+    if (!fn) return false;
+    try {
+      fn(key, value);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function gmDeleteValue(key) {
+    const fn = gmFunction("GM_deleteValue");
+    if (!fn) return false;
+    try {
+      fn(key);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  const ManagerCompatibility = {
+    required: ["GM_xmlhttpRequest", "GM_registerMenuCommand"],
+    degraded: ["GM_openInTab", "GM_getValue", "GM_setValue", "GM_deleteValue", "GM_unregisterMenuCommand"],
+
+    report() {
+      const names = [...this.required, ...this.degraded];
+      const available = names.reduce((result, name) => {
+        result[name] = !!gmFunction(name);
+        return result;
+      }, {});
+      const missingRequired = this.required.filter(name => !available[name]);
+      const warnings = [];
+      if (!available.GM_openInTab) warnings.push("GM_openInTab unavailable; external pages fall back to window.open.");
+      if (!available.GM_getValue || !available.GM_setValue) warnings.push("GM storage unavailable; settings may not persist in this manager.");
+      if (!available.GM_deleteValue) warnings.push("GM_deleteValue unavailable; reset may only reload default settings in this manager.");
+      if (!available.GM_unregisterMenuCommand) warnings.push("GM_unregisterMenuCommand unavailable; stale menu entries may remain until reload.");
+      if (COMPAT_STATE.trustedTypes.status === "renamed") warnings.push("Trusted Types base policy already existed; using a per-run fallback policy name.");
+      if (COMPAT_STATE.trustedTypes.status === "fallback") warnings.push("Trusted Types policy creation failed; strict CSP pages may block modal rendering.");
+      return {
+        ok: missingRequired.length === 0,
+        canMenu: available.GM_registerMenuCommand,
+        canFetch: available.GM_xmlhttpRequest,
+        missingRequired,
+        warnings,
+        available,
+        trustedTypes: { ...COMPAT_STATE.trustedTypes },
+        manager: this.managerInfo()
+      };
+    },
+
+    managerInfo() {
+      const info = globalThis?.GM_info || {};
+      return {
+        handler: info.scriptHandler || info.script_handler || info.handler || "unknown",
+        version: info.version || info.scriptHandlerVersion || "unknown",
+        scriptName: info.script?.name || "UserScript Finder"
+      };
+    },
+
+    diagnosticLines(report = this.report()) {
+      return [
+        `manager=${report.manager.handler}`,
+        `managerVersion=${report.manager.version}`,
+        ...Object.keys(report.available).sort().map(name => `${name}=${report.available[name] ? "ok" : "missing"}`),
+        `trustedTypes=${report.trustedTypes.status}`,
+        `trustedTypesPolicy=${report.trustedTypes.policyName || "none"}`,
+        `compatWarnings=${report.warnings.length}`,
+        `compatMissingRequired=${report.missingRequired.join(",") || "none"}`
+      ];
+    }
+  };
+
   const MatchCoverage = {
     evaluate(source, displayHost, currentUrl) {
       const meta = this.extractUserScriptMetadata(source);
@@ -630,13 +738,18 @@
 
     requestText(url, { source, headers = {}, notFound = "" } = {}) {
       return new Promise((resolve, reject) => {
+        const request = gmFunction("GM_xmlhttpRequest");
+        if (!request) {
+          reject(this.error(source, "GM_xmlhttpRequest is unavailable in this userscript manager", "compat", 0));
+          return;
+        }
         let settled = false;
         const done = (fn, value) => {
           if (settled) return;
           settled = true;
           fn(value);
         };
-        GM_xmlhttpRequest({
+        request({
           method: "GET",
           url,
           headers,
@@ -664,6 +777,7 @@
     window.__SF_TEST_HOOKS__.SourceRuntime = SourceRuntime;
     window.__SF_TEST_HOOKS__.SOURCE_META = SOURCE_META;
     window.__SF_TEST_HOOKS__.SOURCE_ORDER = SOURCE_ORDER;
+    window.__SF_TEST_HOOKS__.ManagerCompatibility = ManagerCompatibility;
   }
 
   const InstallSafety = {
@@ -717,7 +831,7 @@
   class SettingsService {
     constructor() { this.settings = this.loadSettings(); }
     loadSettings() {
-      const saved = GM_getValue("sf_settings_v4", {}) || {};
+      const saved = gmGetValue("sf_settings_v4", {}) || {};
       const settings = { ...DEFAULT_SETTINGS, ...saved };
       settings.sources = this.normalizeSources(saved.sources);
       settings.sensitiveHostProtection = saved.sensitiveHostProtection !== false;
@@ -732,7 +846,7 @@
         settings.lastService = SOURCE_ORDER.find(source => settings.sources[source]) || "greasyfork";
         serviceChanged = true;
       }
-      if (sourceChanged || serviceChanged || hostSettingsChanged) GM_setValue("sf_settings_v4", settings);
+      if (sourceChanged || serviceChanged || hostSettingsChanged) gmSetValue("sf_settings_v4", settings);
       return settings;
     }
     normalizeSources(savedSources = {}) {
@@ -746,7 +860,7 @@
       if (!Array.isArray(value)) return [];
       return [...new Set(value.map(host => HostService.normalizeHost(host)).filter(Boolean))];
     }
-    saveSettings() { GM_setValue("sf_settings_v4", this.settings); }
+    saveSettings() { gmSetValue("sf_settings_v4", this.settings); }
     get(key) { return this.settings[key]; }
     set(key, value) { this.settings[key] = value; this.saveSettings(); }
   }
@@ -2292,6 +2406,8 @@
 .sf-source-notice.bad { border-color: ${THEME.red}44; color: ${THEME.red}; }
 .sf-source-notice-title { color: ${THEME.text}; font-weight: 800; margin-bottom: 4px; }
 .sf-source-notice a { color: inherit; font-weight: 800; text-decoration: underline; }
+.sf-compat-list { margin: 10px auto 0; padding: 0; max-width: 420px; display: grid; gap: 6px; list-style: none; }
+.sf-compat-list li { color: ${THEME.subtext1}; font: 600 12px/1.4 inherit; }
 .sf-error-actions { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
 .sf-action-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -2438,9 +2554,16 @@
       this.settingsOpen = false;
       this.previousFocus = null;
       this.uiBuilt = false;
+      this.compatibility = ManagerCompatibility.report();
     }
 
     init() {
+      this.compatibility = ManagerCompatibility.report();
+      if (!this.compatibility.canMenu) {
+        this._ensureUI();
+        this._openCompatibilityReport();
+        return;
+      }
       this._setupMenuCommands();
     }
 
@@ -2835,37 +2958,50 @@
 
     // ── Menu commands ───────────────────────────────────────────────
     _setupMenuCommands() {
-      if (typeof GM_registerMenuCommand !== "function") return;
-      if (window._sfMenuIds) window._sfMenuIds.forEach(id => { try { GM_unregisterMenuCommand(id); } catch {} });
+      const registerMenuCommand = gmFunction("GM_registerMenuCommand");
+      const unregisterMenuCommand = gmFunction("GM_unregisterMenuCommand");
+      if (!registerMenuCommand) return;
+      if (window._sfMenuIds) window._sfMenuIds.forEach(id => { try { unregisterMenuCommand?.(id); } catch {} });
       window._sfMenuIds = [];
+      this.compatibility = ManagerCompatibility.report();
 
       this._ensureCurrentSource();
       const domain = HostService.extractRootDomain(this.currentDomain);
       const hostBlock = this._currentHostBlock();
 
+      if (!this.compatibility.ok) {
+        window._sfMenuIds.push(registerMenuCommand("Script Finder compatibility report", () => {
+          this._ensureUI();
+          this._openCompatibilityReport();
+        }));
+        window._sfMenuIds.push(registerMenuCommand("Reset Script Finder Settings", () => this._resetSettings()));
+        return;
+      }
+
       if (hostBlock) {
-        window._sfMenuIds.push(GM_registerMenuCommand(`Script Finder blocked on ${hostBlock.host} (Settings)`, () => {
+        window._sfMenuIds.push(registerMenuCommand(`Script Finder blocked on ${hostBlock.host} (Settings)`, () => {
           this._ensureUI();
           this._open();
         }));
-        window._sfMenuIds.push(GM_registerMenuCommand("Reset Script Finder Settings", () => {
-          GM_deleteValue("sf_settings_v4"); location.reload();
-        }));
+        window._sfMenuIds.push(registerMenuCommand("Reset Script Finder Settings", () => this._resetSettings()));
         return;
       }
 
       this._enabledSourceNames().forEach(source => {
         const meta = SOURCE_META[source];
-        window._sfMenuIds.push(GM_registerMenuCommand(`Find ${meta.menuKind} for ${domain} (${meta.menuName})`, () => {
+        window._sfMenuIds.push(registerMenuCommand(`Find ${meta.menuKind} for ${domain} (${meta.menuName})`, () => {
           this._ensureUI();
           if (this._isSourceEnabled(source)) this.currentService = source;
           this._open();
         }));
       });
 
-      window._sfMenuIds.push(GM_registerMenuCommand("Reset Script Finder Settings", () => {
-        GM_deleteValue("sf_settings_v4"); location.reload();
-      }));
+      window._sfMenuIds.push(registerMenuCommand("Reset Script Finder Settings", () => this._resetSettings()));
+    }
+
+    _resetSettings() {
+      gmDeleteValue("sf_settings_v4");
+      location.reload();
     }
 
     _focusableElements() {
@@ -2896,6 +3032,7 @@
     _open() {
       this.isOpen = true;
       this.previousFocus = document.activeElement;
+      this.compatibility = ManagerCompatibility.report();
       this._ensureCurrentSource();
       this._renderTabs();
       this._updateTabs();
@@ -2905,6 +3042,10 @@
       this.searchInput.value = "";
       this.searchQuery = "";
       requestAnimationFrame(() => this.searchInput.focus({ preventScroll: true }));
+      if (!this.compatibility.ok) {
+        this._showCompatibilityReport();
+        return;
+      }
       const hostBlock = this._currentHostBlock();
       if (hostBlock) {
         this._showHostBlocked(hostBlock);
@@ -2964,19 +3105,32 @@
     }
 
     _sourceNoticeHtml() {
-      if (!this.sourceStatus) return "";
-      const status = this.sourceStatus;
-      const cls = status.type === "stale" || status.type === "partial" ? "warn" : "bad";
-      const directUrl = this.services[this.currentService].getDirectSearchUrl(this.currentDomain);
-      return `
-        <div class="sf-source-notice ${cls}">
-          <div class="sf-source-notice-title">${escapeHtml(status.title || "Source status")}</div>
-          <div>${escapeHtml(status.detail || "The source returned a degraded result.")} <a href="${escapeHtml(directUrl)}" target="_blank">Search manually</a></div>
-        </div>
-      `;
+      const notices = [];
+      const compat = this.compatibility || ManagerCompatibility.report();
+      if (compat.warnings.length) {
+        notices.push(`
+          <div class="sf-source-notice warn">
+            <div class="sf-source-notice-title">Manager degraded mode</div>
+            <div>${escapeHtml(compat.warnings[0])}</div>
+          </div>
+        `);
+      }
+      if (this.sourceStatus) {
+        const status = this.sourceStatus;
+        const cls = status.type === "stale" || status.type === "partial" ? "warn" : "bad";
+        const directUrl = this.services[this.currentService].getDirectSearchUrl(this.currentDomain);
+        notices.push(`
+          <div class="sf-source-notice ${cls}">
+            <div class="sf-source-notice-title">${escapeHtml(status.title || "Source status")}</div>
+            <div>${escapeHtml(status.detail || "The source returned a degraded result.")} <a href="${escapeHtml(directUrl)}" target="_blank">Search manually</a></div>
+          </div>
+        `);
+      }
+      return notices.join("");
     }
 
     _sourceErrorTitle(err, label) {
+      if (err?.kind === "compat") return `${label} compatibility issue`;
       if (err?.kind === "rate-limit") return `${label} rate limit`;
       if (err?.kind === "timeout") return `${label} timed out`;
       if (err?.kind === "backoff") return `${label} is backing off`;
@@ -3006,6 +3160,44 @@
         this.modal.querySelector(".sf-settings").classList.add("visible");
       });
       this._syncHostPrivacyControls();
+    }
+
+    _openCompatibilityReport() {
+      this.isOpen = true;
+      this.previousFocus = document.activeElement;
+      this.modal.classList.add("visible");
+      requestAnimationFrame(() => this.modal.focus({ preventScroll: true }));
+      this._showCompatibilityReport();
+    }
+
+    _showCompatibilityReport() {
+      const report = this.compatibility || ManagerCompatibility.report();
+      const issues = [
+        ...report.missingRequired.map(name => `${name} is required for source menus or network requests.`),
+        ...report.warnings
+      ];
+      this.allScripts = [];
+      this.sourceStatus = null;
+      this._setResultCount(0);
+      this.content.setAttribute("aria-busy", "false");
+      this.modal.querySelector(".sf-modal-title").textContent = "Manager compatibility";
+      _safeHTML(this.content, `
+        <div class="sf-error sf-compat-report">
+          <div class="sf-error-title">Userscript manager degraded mode</div>
+          <div class="sf-error-text">Detected ${escapeHtml(report.manager.handler)} ${escapeHtml(report.manager.version)}. Script Finder needs menu commands and GM_xmlhttpRequest for full discovery.</div>
+          <ul class="sf-compat-list">
+            ${issues.map(issue => `<li>${escapeHtml(issue)}</li>`).join("")}
+          </ul>
+          <div class="sf-error-actions">
+            <button class="sf-action-btn sf-compat-settings-btn" type="button">Settings</button>
+          </div>
+        </div>
+      `);
+      this.content.querySelector(".sf-compat-settings-btn")?.addEventListener("click", () => {
+        this.settingsOpen = true;
+        this.modal.querySelector(".sf-settings").classList.add("visible");
+      });
+      this._updateHealthUi();
     }
 
     _recordSourceHealth(serviceName, health) {
@@ -3070,6 +3262,7 @@
       const cacheAge = health.cachedAt ? SourceRuntime.ageLabel(health.cachedAt) : "none";
       return [
         "UserScript Finder source diagnostic",
+        ...ManagerCompatibility.diagnosticLines(this.compatibility || ManagerCompatibility.report()),
         `source=${this.currentService}`,
         `host=${rootHost}`,
         `status=${health.type}`,
@@ -3093,6 +3286,11 @@
 
     // ── Data ────────────────────────────────────────────────────────
     async _loadScripts() {
+      this.compatibility = ManagerCompatibility.report();
+      if (!this.compatibility.ok) {
+        this._showCompatibilityReport();
+        return;
+      }
       const hostBlock = this._currentHostBlock();
       if (hostBlock) {
         this._showHostBlocked(hostBlock);
@@ -3299,7 +3497,12 @@
       const validation = InstallSafety.validateInstallUrl(script || { _source: this.currentService }, url);
       if (!validation.ok) return Promise.reject(new Error(`Preview blocked: ${validation.reason}`));
       return new Promise((resolve, reject) => {
-        GM_xmlhttpRequest({
+        const request = gmFunction("GM_xmlhttpRequest");
+        if (!request) {
+          reject(SourceRuntime.error("Preview", "GM_xmlhttpRequest is unavailable in this userscript manager", "compat", 0));
+          return;
+        }
+        request({
           method: "GET", url: validation.url,
           headers: { Accept: "text/plain,*/*" },
           onload: r => {
@@ -3309,6 +3512,16 @@
           onerror: reject
         });
       });
+    }
+
+    _openUrl(url) {
+      const openInTab = gmFunction("GM_openInTab");
+      if (openInTab) {
+        openInTab(url, { active: true });
+        return;
+      }
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) window.location.href = url;
     }
 
     _parseMatchCoverage(source, host, currentUrl) {
@@ -3343,7 +3556,7 @@
           this.toast.show("Install blocked: .user.js metadata block missing.");
           return;
         }
-        GM_openInTab(validation.url, { active: true });
+        this._openUrl(validation.url);
       } catch(err) {
         this.toast.show(`Install check failed: ${err?.message || "could not load metadata"}`);
       } finally {
@@ -3477,7 +3690,7 @@
         actionEl.addEventListener("click", (e) => {
           e.stopPropagation();
           if (actionEl.dataset.action === "install") this._openInstallTarget(script, actionEl);
-          else GM_openInTab(actionEl.dataset.url, { active: true });
+          else this._openUrl(actionEl.dataset.url);
         });
       }
       const previewEl = item.querySelector(".sf-preview-btn");
@@ -3492,7 +3705,7 @@
       // Click-to-open script page
       item.addEventListener("click", (e) => {
         if (e.target.closest("a") || e.target.closest(".sf-install-btn")) return;
-        GM_openInTab(scriptUrl, { active: true });
+        this._openUrl(scriptUrl);
       });
 
       return item;
