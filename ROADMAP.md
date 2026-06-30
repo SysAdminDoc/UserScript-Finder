@@ -222,3 +222,47 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
   Touches: `ScriptFinder._displayScripts`, result count/live region updates, dense mode rendering, browser smoke tests.
   Acceptance: Large result sets render in measured chunks or a virtualized list, keep the modal responsive, and preserve keyboard/focus behavior.
   Complexity: M
+
+## Research-Driven Additions
+
+- [ ] P1 - Add first-run network disclosure and source preflight
+  Why: All registered sources are enabled by default and the metadata grants broad external registry access, so privacy-conscious users need to review enabled destinations before first fetch.
+  Evidence: UserScript-Finder.user.js @connect header, DEFAULT_SOURCE_SETTINGS; Magic Userscript+ source toggles/blacklist; Stylus no-tracking positioning.
+  Touches: SettingsService, ScriptFinder open/load flow, source settings UI, diagnostics payload, source privacy tests, README privacy notes.
+  Acceptance: First run, new source additions, or reset settings show a dismissible prefetch disclosure with host and enabled source destinations; users can disable sources before any fetch starts, and the choice persists.
+  Complexity: M
+
+- [ ] P1 - Add generated @connect allowlist audit
+  Why: Every new source expands install-time network permissions, and current manual metadata can drift from adapters and docs.
+  Evidence: UserScript-Finder.user.js @connect lines and SOURCE_META; Tampermonkey/Violentmonkey metadata docs; Chrome Web Store remote-code and permission policy.
+  Touches: userscript metadata header, source adapter registry, README source table, local release/test script.
+  Acceptance: A local check fails when an adapter requires a domain missing from @connect, when @connect contains an orphan domain, or when README source documentation omits an enabled source.
+  Complexity: S
+
+- [ ] P2 - Add diagnostics manual-copy fallback
+  Why: Clipboard APIs can be unavailable or denied, and the current fallback only writes diagnostics to the browser console.
+  Evidence: UserScript-Finder.user.js _copyDiagnostics; MDN Clipboard API; quoid/userscripts issue #887.
+  Touches: diagnostics panel, toast/live-region messaging, modal markup tests, diagnostics tests.
+  Acceptance: When navigator.clipboard.writeText fails, the modal shows a selectable diagnostics text area with retry-copy and close controls while preserving console logging.
+  Complexity: S
+
+- [ ] P2 - Add release metadata consistency checks
+  Why: Raw userscript distribution depends on synchronized @version, install/update URLs, README badges, changelog entries, and license metadata.
+  Evidence: UserScript-Finder.user.js metadata header, README badges/install URLs, CHANGELOG.md, Tampermonkey @downloadURL/@updateURL docs.
+  Touches: local test/release script, README, CHANGELOG, userscript metadata, version docs.
+  Acceptance: One local command validates version consistency, license metadata, raw GitHub @downloadURL/@updateURL reachability, and README badge alignment before release.
+  Complexity: S
+
+- [ ] P2 - Add rendered modal smoke tests
+  Why: Existing tests assert markup but not actual desktop/mobile layout, and competitor issues show real clipping, overflow, and browser-specific rendering failures.
+  Evidence: tests/accessibility-markup.test.cjs, tests/diagnostics-markup.test.cjs; Magic Userscript+ issues #4, #5, #15, #21, #32, #70.
+  Touches: portable test runner, browser fixture page, modal state fixtures, screenshot/pixel assertions, .gitignore for generated artifacts.
+  Acceptance: Local browser tests render empty, loading, error, many-results, settings, and diagnostics states at desktop and mobile widths with no clipped controls, horizontal overflow, or focus trap breakage.
+  Complexity: M
+
+- [ ] P2 - Add aggregate all-sources comparison mode
+  Why: Users often need the best current-site candidate across registries and stores, not one source tab at a time.
+  Evidence: Magic Userscript+ multi-source discovery; UserScriptHunt unified search; current source tabs and ScriptFinder._loadScripts single-source flow.
+  Touches: source runtime scheduler, dedupe helper, result grouping UI, source health footer, privacy controls, adapter fixtures.
+  Acceptance: An All view queries enabled sources within existing privacy/timeouts, groups duplicate install/view URLs, shows per-source health, and preserves source-specific tabs for focused troubleshooting.
+  Complexity: L

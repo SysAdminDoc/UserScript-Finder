@@ -1,99 +1,90 @@
 # Research - UserScript Finder
 
 ## Executive Summary
-UserScript Finder is a single-file userscript that opens a zero-footprint Shadow DOM modal from Tampermonkey/Violentmonkey menu commands and searches the current site across GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, catalogs, GitHub Gists, and GitHub. Verified: v1.9.0-v1.15.0 drained the prior highest-risk work around resilience, install validation, public-suffix normalization, accessibility, adapter tests, diagnostics, and per-source privacy controls. The highest-value direction now is precision and trust: remove stale completed roadmap rows, improve subdomain relevance, avoid unwanted network calls on sensitive hosts, expose extension permissions/privacy, make settings consistent across tabs, add ScriptCat as the next source, and make the test harness portable.
-
-Top opportunities:
-- P0: Reconcile `ROADMAP.md` with shipped work recorded in `CHANGELOG.md`.
-- P1: Add host-level privacy blacklist/no-fetch rules for sensitive sites.
-- P1: Post-filter root-domain registry results with metadata coverage to fix subdomain noise.
-- P1: Show extension permission/privacy badges for Chrome Web Store and AMO results.
-- P1: Add manager/browser compatibility checks and degraded-mode messages.
-- P2: Add cross-tab settings sync with `GM_addValueChangeListener` plus polling fallback.
-- P2: Add ScriptCat as an optional source.
-- P2: Add fielded result filtering and source-specific domain/keyword query modes.
-- P2: Add a portable local test runner manifest instead of hardcoded runtime paths.
-- P2: Chunk or virtualize large result rendering.
+UserScript Finder is a single-file userscript for Tampermonkey/Violentmonkey-style managers that opens a menu-triggered Shadow DOM modal and discovers current-site scripts, styles, extensions, gists, catalogs, and GitHub-hosted candidates. Verified: the strongest current shape is trust-oriented, zero-footprint discovery with source resilience, install handoff checks, public-suffix-aware host handling, accessibility markup, diagnostics, and per-source privacy controls already shipped in `UserScript-Finder.user.js` and `CHANGELOG.md`. The highest-value direction is to remove planning drift, make every network/source decision explainable, and harden real-world manager/browser behavior before adding more sources. Top opportunities: reconcile completed roadmap rows; add sensitive-host no-fetch rules; add first-run network disclosure; post-filter root-domain results with metadata coverage; expose extension permission/privacy badges; harden manager/Trusted Types degraded modes; add cross-tab settings sync; add ScriptCat/source-specific query modes; add release metadata and `@connect` drift checks; add visual smoke coverage for modal states.
 
 ## Product Map
-- Core workflows: open per-site source menu, fetch a source, filter/sort results, inspect source health, preview match coverage, install or view a result.
-- User personas: power users looking for site-specific scripts, users comparing extension alternatives, privacy-conscious users limiting network calls, maintainers validating source reach and parser drift.
-- Platforms and distribution: Tampermonkey, Violentmonkey, and Greasemonkey-compatible userscript managers; raw GitHub install/update URLs; no package manifest or build step.
-- Key integrations and data flows: `GM_xmlhttpRequest` reaches registries/stores/catalogs/GitHub; `GM_setValue` stores settings; `GM_openInTab` hands install/view URLs to the manager/browser; fixture-backed `.cjs` tests exercise adapters and UI markup.
+- Core workflows: open source menu command; fetch one source for the current host; sort/filter results; inspect source health/diagnostics; open a validated install/view URL.
+- User personas: power users looking for current-site userscripts; privacy-conscious users limiting external registry calls; extension users comparing lower-risk userscript alternatives; maintainers tracking parser/source drift.
+- Platforms and distribution: raw GitHub userscript install/update URLs; userscript managers that provide `GM_xmlhttpRequest`, `GM_openInTab`, storage, styles, and menu commands; no package manifest or build step.
+- Key integrations and data flows: `@connect` permits registry/store/GitHub domains; `GM_xmlhttpRequest` fetches source data; `GM_setValue` persists settings; `GM_openInTab` delegates install/view; `.cjs` tests execute local adapter and markup contracts.
 
 ## Competitive Landscape
-- Magic Userscript+: Direct competitor for current-page userscript/userstyle discovery. Learn from mobile/desktop UI, import/export, theme config, GitHub token support, code/metadata preview, sensitive-host blacklist, filter grammar, and web-extension fallback; avoid its visible page bubble because this project intentionally stays menu-only until activated.
-- Find Scripts For This Site: Direct lightweight competitor. Learn from per-repository domain/keyword search toggles, ScriptCat support, cross-tab settings sync, i18n menu strings, and menu reordering; avoid opening many external tabs as the primary UX when this repo already has an in-page comparison modal.
-- Greasy Fork/OpenUserJS: Registry baselines. Learn from by-site metadata, install/update URLs, localized metadata, stats, and direct script details; avoid assuming root-domain by-site results are precise for subdomains.
-- Stylus/UserStyles.world: Adjacent userstyle ecosystem. Learn from style gallery discovery, backup/export, usercss metadata, preview screenshots, and no-tracking positioning; avoid becoming a full style manager.
-- Tampermonkey/Violentmonkey/ScriptCat/quoid/userscripts: Manager ecosystem. Learn from import/export, sync, mobile constraints, per-site enable/disable friction, permission troubleshooting, and manager API variance; avoid replacing install/edit/update workflows.
-- Chrome Web Store/Mozilla AMO/Edge Add-ons: Extension alternative sources. Learn from ratings, daily users, reviews, privacy policy, data collection, permissions, promoted/recommended signals, and official AMO API shape; avoid treating scraped store search pages as stable contracts when a structured API exists.
-- UserScriptHunt: Sibling standalone search app. Learn from aggregate search/dedupe expectations; keep this repo focused on current-site in-page discovery.
+- Magic Userscript+: Direct current-site discovery competitor with mobile/desktop UI, import/export, theme config, GitHub token support, code preview, sensitive-host blacklist, and web-extension distribution. Learn source disclosure, filter grammar, browser issue docs, and blacklist UX; avoid its always-visible page bubble because this project is intentionally menu-triggered.
+- Find Scripts For This Site: Direct lightweight userscript competitor covering Greasy Fork, OpenUserJS, ScriptCat, GitHub, and Gist with domain/keyword modes, i18n menu strings, and cross-tab setting sync. Learn per-source query modes and `GM_addValueChangeListener` fallback sync; avoid making external tabs the primary result UI.
+- UserScriptHunt: Adjacent sibling aggregate search app for Greasy Fork, Sleazy Fork, GitHub, and OpenUserJS. Learn cross-source comparison and dedupe expectations; keep this repo focused on current-host in-page discovery.
+- Greasy Fork/OpenUserJS/ScriptCat: Registry baselines. Learn by-site metadata, install/update URLs, localized metadata, stats, and source availability signals; avoid assuming root-domain registry hits precisely match subdomains.
+- Stylus/UserStyles.world: Adjacent userstyle ecosystem with no-tracking positioning, gallery discovery, backups, metadata/source mirroring, previews, and update flows. Learn trust copy, export/import, and style source metadata; avoid becoming a full style manager/editor.
+- Tampermonkey/Violentmonkey/quoid/userscripts: Manager ecosystem. Learn API variance, permission troubleshooting, install/update metadata, mobile/Safari constraints, sync/import/export pressure, and logging needs; avoid replacing manager-owned install/edit/update workflows.
+- Chrome Web Store/Mozilla AMO/Edge Add-ons: Extension alternative sources. Learn permission, host-permission, privacy policy, promoted/recommended, review, update, and user-count signals; avoid treating scraped store pages as stable contracts when structured APIs exist.
 
 ## Security, Privacy, and Reliability
-- Verified: `ROADMAP.md` still contains completed work from v1.8.1-v1.15.0, including install safety, source resilience, accessibility, adapter tests, diagnostics, and per-source privacy. This is a planning reliability defect because future agents can reimplement shipped work.
-- Verified: `UserScript-Finder.user.js` `ScriptService.searchScriptsByHost` falls back from exact host to root domain, but `ScriptService._filter` trusts registry domain fields and does not fetch candidate metadata to prove `@match`/`@include` coverage for noisy subdomain cases.
-- Verified: `UserScript-Finder.user.js` runs on `*://*/*` and has per-source toggles, but no host-level blacklist/no-fetch setting for banks, government, localhost, admin consoles, identity pages, or user-defined sensitive domains.
-- Verified: Chrome Web Store and AMO result adapters normalize users/ratings/update data, but they do not surface extension permissions, host permissions, privacy policies, promoted/recommended status, or data collection fields available from AMO and store pages.
-- Verified: settings are persisted with `GM_setValue`, but there is no `GM_addValueChangeListener` or polling fallback, so settings changed in one tab do not update menus/tabs in existing tabs until reload/reopen.
-- Verified: tests pass locally, but every browser-backed `.cjs` test hardcodes a machine-local runtime path instead of a portable `package.json`/local dependency path.
-- Likely: Greasemonkey/AdGuard/manager compatibility claims need live validation because Magic Userscript+ has current open compatibility issues around AdGuard 204 responses and Trusted Types policy collisions.
-- Missing guardrails: no fielded filter parser, no source query mode control, no manager-capability detection panel, and no large-result rendering budget despite adapters returning up to 200 rows.
-- Recovery needs: settings export/import is already in `ROADMAP.md`; add sync and compatibility diagnostics before expanding stored settings further.
+- Verified: `ROADMAP.md` still contains completed v1.8.1-v1.15.0 work recorded in `CHANGELOG.md`, including license, install safety, source resilience, public-suffix normalization, accessibility, adapter fixtures, diagnostics, and source privacy controls. This is the top planning reliability defect.
+- Verified: `UserScript-Finder.user.js:17-27` manually lists `@connect` domains while `SOURCE_META` and adapters live separately at `UserScript-Finder.user.js:47-57`; new sources can create permission drift unless release checks validate the allowlist.
+- Verified: `DEFAULT_SOURCE_SETTINGS` enables all registered sources by default at `UserScript-Finder.user.js:58-69`; per-source toggles exist, but there is no first-run prefetch disclosure that lets a user review network destinations before the first active fetch on a host.
+- Verified: `UserScript-Finder.user.js:42-45` creates a Trusted Types policy without a duplicate-policy fallback. Magic Userscript+ documents current Outlook breakage from a duplicated default Trusted Types policy, so the existing manager compatibility roadmap item should include this specific guard.
+- Verified: diagnostics copy falls back only to console logging at `UserScript-Finder.user.js:2577-2587` when `navigator.clipboard.writeText` is unavailable; clipboard APIs are permission/secure-context-sensitive, so bug-report recovery needs an in-modal manual-copy fallback.
+- Verified: Chrome Web Store/AMO adapters normalize basic result data but do not expose extension permissions, host permissions, privacy/data-collection flags, promoted/recommended status, or broad-access warnings even though AMO search responses and store pages expose trust metadata.
+- Verified: settings are persisted with `GM_setValue` at `UserScript-Finder.user.js:507-532`, but no `GM_addValueChangeListener` or polling fallback exists, so settings changed in one tab do not update menus or modals in other open tabs.
+- Likely: existing markup tests catch semantic regressions, but no rendered browser smoke validates clipping/overflow across modal states; Magic Userscript+ issues show real user failures around width growth, off-screen content, Trusted Types/CSP, and browser-specific page breakage.
 
 ## Architecture Assessment
-- `UserScript-Finder.user.js` is still intentionally single-file and ship-readable; keep that distribution model, but continue extracting pure helper contracts inside the file and covering them with `.cjs` tests.
-- Refactor candidates: `SOURCE_META`/adapter registration, `ScriptService._filter`, store adapter normalization, settings persistence, search filter parsing, and result rendering.
-- Test gaps: no package manifest, no `npm test`, no manager compatibility smoke, no fixture for manager API differences, no performance/render budget test, no ScriptCat fixture.
-- Documentation gaps: README documents current v1.15 behavior, but `ROADMAP.md` needs shipped-item pruning; README does not state manager-specific degraded behavior or sensitive-host privacy model.
-- Category coverage: security, privacy, accessibility, i18n, observability, testing, docs, distribution, plugin/source ecosystem, mobile, offline resilience, migration/upgrade strategy are covered by current code or roadmap. Multi-user workflows are intentionally excluded because settings are local-only and adding accounts/server state would contradict the zero-server product shape.
+- Boundary improvements: keep `SOURCE_META`, adapters, `@connect`, README source tables, and fixtures synchronized through a local release check instead of relying on manual review.
+- Refactor candidates: isolate source capability metadata so each adapter declares supported query modes, required connect domains, result fields, and trust badges before more sources are added.
+- UI/testing gaps: add visual smoke coverage for empty/loading/error/many-results/settings/diagnostics states after the portable runner item lands; current `.cjs` tests are useful but not rendered layout tests.
+- Observability gaps: source diagnostics are strong but clipboard failure recovery is weak; add a manual-copy state so diagnostics remain shareable without console spelunking.
+- i18n/l10n: competitors support localized menus and locale filtering; the existing roadmap already covers locale-aware filtering, so do not add another duplicate item.
+- Plugin ecosystem: an adapter plugin pattern is already on the roadmap; keep it internal/static for now because remote plugins would conflict with userscript/store trust boundaries.
+- Mobile/offline/resilience: source resilience and stale-cache fallback are represented in existing roadmap/changelog drift; mobile should be validated through visual smoke, not a separate UI rewrite.
+- Multi-user/migration: intentionally excluded. The project stores per-manager/per-user settings locally and should not add account, team, or server migration flows.
+- Distribution/upgrade strategy: add release metadata consistency checks for `@version`, `@downloadURL`, `@updateURL`, README badge, CHANGELOG, license, and raw GitHub reachability.
 
 ## Rejected Ideas
-- Full userscript manager replacement: Tampermonkey, Violentmonkey, ScriptCat, and quoid/userscripts already own install/edit/update; this project should remain discovery and trust screening.
-- Server-backed trending panel: existing roadmap mentions trending, but a hosted dataset would require telemetry or curation infrastructure that conflicts with local-only privacy unless a public dataset appears.
-- Default external CORS proxy: useful for brittle sources, but a fixed proxy creates privacy and availability risk; keep direct source requests plus manual-search fallbacks.
-- Immediate WebExtension rewrite: Magic Userscript+ shows this can work, but it is a larger distribution and store-review project; stabilize the adapter registry and test harness first.
-- Shortcut-first command UX: source/query commands are useful for power users, but this repo should keep visible controls as the primary path because global rules prohibit keyboard-shortcut-first behavior.
-- Bundled source-summary model: deterministic metadata, grant, permission, age, and source signals should land before adding a large local model dependency.
+- Full WebExtension rewrite - Magic Userscript+ proves a web-extension path is possible, but Chrome MV3 remote-code policy and this repo's userscript-first design make it a separate product, not a near-term roadmap item.
+- Bookmarklet distribution - Magic Userscript+ lists a bookmarklet as not recommended; this project relies on GM APIs and install validation that bookmarklets cannot provide.
+- Built-in script manager/editor - Tampermonkey, Violentmonkey, quoid/userscripts, and Stylus already own install/edit/update/sync flows; duplicating them would increase security and maintenance risk.
+- Remote-loaded adapter plugins - Chrome Web Store MV3 policy and userscript trust expectations favor static reviewed adapters over runtime plugin loading.
+- Public social/recommendation layer - Greasy Fork/UserStyles.world already provide registry-level social signals; this project should consume trust metadata, not host accounts or comments.
+- Multi-user/team sync - No evidence of demand for shared team workflows in current-site discovery; manager-level sync/import/export is the better fit.
 
 ## Sources
-Project and local ecosystem:
-- https://github.com/SysAdminDoc/UserScript-Finder
-- https://github.com/SysAdminDoc/UserScriptHunt
-
-Direct competitors and adjacent OSS:
+Competitive:
 - https://github.com/magicoflolis/Userscript-Plus
-- https://github.com/magicoflolis/Userscript-Plus/issues/68
-- https://github.com/utags/userscripts/blob/main/find-scripts-for-this-site/README.md
-- https://github.com/greasyfork-org/greasyfork
-- https://github.com/OpenUserJs/OpenUserJS.org
+- https://github.com/utags/userscripts/tree/main/find-scripts-for-this-site
+- https://github.com/SysAdminDoc/UserScriptHunt
 - https://github.com/scriptscat/scriptcat
-- https://github.com/awesome-scripts/awesome-userscripts
+- https://github.com/greasyfork-org/greasyfork
 - https://github.com/openstyles/stylus
 - https://github.com/userstyles-world/userstyles.world
 - https://github.com/violentmonkey/violentmonkey
 - https://github.com/quoid/userscripts
 
-Platform APIs, specs, and docs:
-- https://www.tampermonkey.net/documentation.php
-- https://violentmonkey.github.io/api/gm/
+Issue signal:
+- https://github.com/magicoflolis/Userscript-Plus/issues/68
+- https://github.com/magicoflolis/Userscript-Plus/issues/71
+- https://github.com/magicoflolis/Userscript-Plus/issues/61
+- https://github.com/violentmonkey/violentmonkey/issues/2540
+- https://github.com/violentmonkey/violentmonkey/issues/2263
+- https://github.com/quoid/userscripts/issues/836
+- https://github.com/quoid/userscripts/issues/887
+
+APIs and standards:
+- https://www.tampermonkey.net/documentation.php?locale=en
 - https://violentmonkey.github.io/api/metadata-block/
+- https://violentmonkey.github.io/api/gm/
+- https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Match_patterns
+- https://publicsuffix.org/
+- https://developer.mozilla.org/en-US/docs/Web/API/TrustedTypePolicyFactory/createPolicy
+- https://developer.mozilla.org/en-US/docs/Web/API/Clipboard_API
+- https://developer.chrome.com/docs/webstore/program-policies/mv3-requirements
 - https://mozilla.github.io/addons-server/topics/api/addons.html
 - https://docs.github.com/en/rest/search/search
-- https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
-- https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns
-- https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Match_patterns
-- https://wiki.greasespot.net/Metadata_Block
-- https://wiki.greasespot.net/Include_and_exclude_rules
-- https://publicsuffix.org/
-- https://developer.mozilla.org/en-US/docs/Web/API/Trusted_Types_API
-- https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/
 
-Security and community signal:
-- https://adguard.com/kb/general/extensions/#userscripts
-- https://nvd.nist.gov/vuln/detail/CVE-2005-2455
-- https://github.com/violentmonkey/violentmonkey/issues/2403
-- https://github.com/violentmonkey/violentmonkey/issues/2410
+Live endpoints:
+- https://greasyfork.org/en/scripts/by-site/reddit.com.json?language=all
+- https://microsoftedge.microsoft.com/edgestorewebautocomplete/v1/search?q=reddit
+- https://addons.mozilla.org/api/v5/addons/search/?q=reddit&type=extension
+- https://userstyles.world/api/index/uso-format
 
 ## Open Questions
-None.
+None blocking. The next implementation agent can prioritize directly from `ROADMAP.md`; manager/browser compatibility details require live matrix testing during implementation, not more research.
