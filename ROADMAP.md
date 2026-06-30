@@ -74,55 +74,6 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
 
 ## Research-Driven Additions
 
-- [ ] P0 - Add source timeouts, backoff, and stale-cache fallback
-  Why: Adapter failures and rate limits can collapse into empty results, making outages look like no scripts exist.
-  Evidence: `UserScript-Finder.user.js` adapter `_fetch` methods, `_loadScripts`; GitHub Search API rate-limit docs.
-  Touches: shared fetch helper, every source adapter, result empty/error state, settings cache handling.
-  Acceptance: Each source has a timeout, classifies rate-limit/parse/network errors, reuses stale cached results when available, and displays a source-specific retry/manual-search path.
-  Complexity: M
-
-- [ ] P0 - Validate install URLs before opening them
-  Why: Registry and scraped results feed direct install handoffs; the app should refuse unexpected origins or non-userscript payloads before invoking the manager.
-  Evidence: `UserScript-Finder.user.js` `_createScriptItem`, Gist/GitHub/raw install flows, userscript metadata docs.
-  Touches: source adapter result normalization, install button handler, match preview fetcher, error/toast copy.
-  Acceptance: Install buttons only open adapter-allowlisted HTTPS origins with `.user.js` metadata; invalid results downgrade to View with an explicit warning.
-  Complexity: M
-
-- [ ] P1 - Replace root-domain parsing with Public Suffix List-grade normalization
-  Why: The hand-rolled suffix list handles only a few second-level domains and can miss domains such as multi-part public suffixes and hosted subdomains.
-  Evidence: `UserScript-Finder.user.js` `HostService.extractRootDomain`; Public Suffix List.
-  Touches: `HostService`, source query construction, related-site suggestions, parser fixtures.
-  Acceptance: Tests cover `co.uk`, `com.au`, `github.io`, common mobile prefixes, localhost/IPs, and exact host fallback behavior.
-  Complexity: M
-
-- [ ] P1 - Add modal accessibility semantics and focus management
-  Why: The Shadow DOM modal lacks dialog roles, live result announcements, and focus containment/restoration expected by assistive technology.
-  Evidence: `UserScript-Finder.user.js` modal markup/event wiring; WAI-ARIA modal dialog pattern.
-  Touches: modal creation, close/open lifecycle, loading/error/result count elements, tab controls.
-  Acceptance: Modal opens with `role="dialog"` and `aria-modal`, focus moves into it and returns on close, result counts/errors announce via `aria-live`, and controls have accessible names.
-  Complexity: M
-
-- [ ] P1 - Add adapter contract and fixture-based parser tests
-  Why: Eight sources now normalize heterogeneous HTML/API payloads with no executable guardrail against markup drift or field regressions.
-  Evidence: `UserScript-Finder.user.js` source classes; recent commit history adding one adapter at a time.
-  Touches: parser helpers, source adapters, lightweight Node/browser test harness, sample fixtures.
-  Acceptance: A local test command validates each adapter's sample payload into the shared result shape and verifies sorting/filter helper behavior.
-  Complexity: M
-
-- [ ] P1 - Surface per-source health and diagnostics
-  Why: Users need to distinguish no results from source outages, rate limits, blocked fetches, and parser drift without opening DevTools.
-  Evidence: `UserScript-Finder.user.js` `_loadScripts` generic error state; GitHub rate-limit docs; Chrome extension network docs.
-  Touches: shared fetch result type, modal header/status area, empty/error states, copy diagnostics action.
-  Acceptance: Each tab shows OK/stale/rate-limited/failed state, last fetch time, cached result age, and a copyable diagnostic string with no personal page content beyond host/source/status.
-  Complexity: S
-
-- [ ] P1 - Add per-source privacy controls
-  Why: Some users will want to disable adult, store, GitHub, or catalog network calls while preserving local-only settings.
-  Evidence: `UserScript-Finder.user.js` menu registration always includes all sources; AdGuard userscript trust guidance.
-  Touches: settings schema, menu registration, tab rendering, reset/settings UI.
-  Acceptance: Users can disable individual sources; disabled sources disappear from menu/tabs and make no network requests until re-enabled.
-  Complexity: S
-
 - [ ] P2 - Add Edge Add-ons and Userstyles.World optional discovery sources
   Why: Extension and style alternatives are adjacent discovery paths when userscripts are unavailable for a site.
   Evidence: Existing Chrome Web Store/Mozilla AMO adapters, roadmap Stylus note, Userstyles.World adjacent ecosystem.
@@ -145,13 +96,6 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
   Complexity: L
 
 ## Research-Driven Additions
-
-- [ ] P0 - Reconcile ROADMAP.md with shipped work
-  Why: `ROADMAP.md` still lists shipped v1.8.1-v1.15.0 work, which can cause future agents to duplicate completed implementation.
-  Evidence: `CHANGELOG.md` v1.8.1-v1.15.0; `ROADMAP.md` existing Research-Driven Additions.
-  Touches: `ROADMAP.md`
-  Acceptance: Completed rows already shipped in `CHANGELOG.md` are deleted; remaining rows describe only incomplete work.
-  Complexity: S
 
 - [ ] P1 - Add sensitive-host no-fetch rules
   Why: Per-source privacy controls do not stop all network discovery on sensitive hosts such as banks, identity pages, localhost, admin consoles, or user-defined domains.
