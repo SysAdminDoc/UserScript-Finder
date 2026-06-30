@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.15.0
+// @version      1.16.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -59,6 +59,57 @@
     settings[source] = true;
     return settings;
   }, {});
+  const DEFAULT_SENSITIVE_HOST_PATTERNS = [
+    "localhost",
+    "*.localhost",
+    "127.*",
+    "10.*",
+    "192.168.*",
+    "172.16.*",
+    "172.17.*",
+    "172.18.*",
+    "172.19.*",
+    "172.20.*",
+    "172.21.*",
+    "172.22.*",
+    "172.23.*",
+    "172.24.*",
+    "172.25.*",
+    "172.26.*",
+    "172.27.*",
+    "172.28.*",
+    "172.29.*",
+    "172.30.*",
+    "172.31.*",
+    "*.local",
+    "*.lan",
+    "*.home",
+    "*.internal",
+    "*.intranet",
+    "*.corp",
+    "*.gov",
+    "*.gov.*",
+    "*.mil",
+    "*.mil.*",
+    "*bank*",
+    "*creditunion*",
+    "login.*",
+    "*.login.*",
+    "auth.*",
+    "*.auth.*",
+    "sso.*",
+    "*.sso.*",
+    "identity.*",
+    "*.identity.*",
+    "admin.*",
+    "*.admin.*",
+    "router.*",
+    "*.router.*",
+    "gateway.*",
+    "*.gateway.*",
+    "firewall.*",
+    "*.firewall.*"
+  ];
 
   // ── Default Settings ────────────────────────────────────────────────
   const DEFAULT_SETTINGS = {
@@ -66,7 +117,10 @@
     defaultSort: "daily",
     denseMode: false,
     lastService: "greasyfork",
-    sources: DEFAULT_SOURCE_SETTINGS
+    sources: DEFAULT_SOURCE_SETTINGS,
+    sensitiveHostProtection: true,
+    sensitiveHostPatterns: "",
+    sensitiveHostOverrides: []
   };
 
   // ── Catppuccin Mocha + OLED palette ─────────────────────────────────
@@ -510,13 +564,19 @@
       const saved = GM_getValue("sf_settings_v4", {}) || {};
       const settings = { ...DEFAULT_SETTINGS, ...saved };
       settings.sources = this.normalizeSources(saved.sources);
+      settings.sensitiveHostProtection = saved.sensitiveHostProtection !== false;
+      settings.sensitiveHostPatterns = typeof saved.sensitiveHostPatterns === "string" ? saved.sensitiveHostPatterns : "";
+      settings.sensitiveHostOverrides = this.normalizeHostList(saved.sensitiveHostOverrides);
       const sourceChanged = SOURCE_ORDER.some(source => saved.sources?.[source] !== settings.sources[source]);
+      const hostSettingsChanged = settings.sensitiveHostProtection !== saved.sensitiveHostProtection ||
+        settings.sensitiveHostPatterns !== saved.sensitiveHostPatterns ||
+        JSON.stringify(settings.sensitiveHostOverrides) !== JSON.stringify(saved.sensitiveHostOverrides || []);
       let serviceChanged = false;
       if (!settings.sources[settings.lastService]) {
         settings.lastService = SOURCE_ORDER.find(source => settings.sources[source]) || "greasyfork";
         serviceChanged = true;
       }
-      if (sourceChanged || serviceChanged) GM_setValue("sf_settings_v4", settings);
+      if (sourceChanged || serviceChanged || hostSettingsChanged) GM_setValue("sf_settings_v4", settings);
       return settings;
     }
     normalizeSources(savedSources = {}) {
@@ -525,6 +585,10 @@
       SOURCE_ORDER.forEach(source => { normalized[source] = safeSources[source] !== false; });
       if (!SOURCE_ORDER.some(source => normalized[source])) normalized.greasyfork = true;
       return normalized;
+    }
+    normalizeHostList(value) {
+      if (!Array.isArray(value)) return [];
+      return [...new Set(value.map(host => HostService.normalizeHost(host)).filter(Boolean))];
     }
     saveSettings() { GM_setValue("sf_settings_v4", this.settings); }
     get(key) { return this.settings[key]; }
@@ -578,6 +642,49 @@
 
     static isIpAddress(host) {
       return /^(?:\d{1,3}\.){3}\d{1,3}$/.test(host) || /^[0-9a-f:]+$/i.test(host);
+    }
+
+    static patternList(value) {
+      return String(value || "")
+        .split(/[\n,]+/)
+        .map(pattern => this.normalizePattern(pattern))
+        .filter(Boolean);
+    }
+
+    static normalizePattern(pattern) {
+      let value = String(pattern || "").trim().toLowerCase();
+      if (!value || value.startsWith("#")) return "";
+      value = value.replace(/^[a-z]+:\/\//, "").split(/[/?#]/)[0].replace(/\.$/, "");
+      if (value.startsWith(".")) value = `*${value}`;
+      return value;
+    }
+
+    static patternMatches(host, pattern) {
+      const normalizedHost = this.normalizeHost(host);
+      const normalizedPattern = this.normalizePattern(pattern);
+      if (!normalizedHost || !normalizedPattern) return false;
+      if (!normalizedPattern.includes("*")) {
+        return normalizedHost === normalizedPattern || normalizedHost.endsWith(`.${normalizedPattern}`);
+      }
+      const escaped = normalizedPattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+      return new RegExp(`^${escaped}$`).test(normalizedHost);
+    }
+
+    static isHostOverridden(host, settings) {
+      const overrides = Array.isArray(settings?.get?.("sensitiveHostOverrides"))
+        ? settings.get("sensitiveHostOverrides")
+        : [];
+      return overrides.some(pattern => this.patternMatches(host, pattern));
+    }
+
+    static sensitiveHostMatch(host, settings) {
+      const normalizedHost = this.normalizeHost(host);
+      if (!normalizedHost || settings?.get?.("sensitiveHostProtection") === false) return null;
+      if (this.isHostOverridden(normalizedHost, settings)) return null;
+      const userPatterns = this.patternList(settings?.get?.("sensitiveHostPatterns"));
+      const patterns = [...DEFAULT_SENSITIVE_HOST_PATTERNS, ...userPatterns];
+      const pattern = patterns.find(candidate => this.patternMatches(normalizedHost, candidate));
+      return pattern ? { host: normalizedHost, pattern } : null;
     }
   }
 
@@ -1999,9 +2106,25 @@
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 0; border-bottom: 1px solid ${THEME.glassBorder};
 }
+.sf-setting-block {
+  display: grid; gap: 8px; padding: 8px 0; border-bottom: 1px solid ${THEME.glassBorder};
+}
 .sf-source-setting-row { padding: 6px 0; }
 .sf-setting-row:last-child { border-bottom: none; }
 .sf-setting-label { font: 500 12px/1.3 inherit; color: ${THEME.subtext1}; }
+.sf-setting-help { color: ${THEME.overlay}; font: 500 11px/1.35 inherit; }
+.sf-setting-textarea {
+  min-height: 64px; resize: vertical; padding: 8px 9px; border-radius: 7px;
+  border: 1px solid ${THEME.glassBorder}; background: ${THEME.surface0};
+  color: ${THEME.text}; font: 500 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+  outline: none;
+}
+.sf-setting-mini-btn {
+  border: 1px solid ${THEME.glassBorder}; background: ${THEME.surface1};
+  color: ${THEME.subtext1}; border-radius: 7px; padding: 6px 10px;
+  font: 800 10px/1 inherit; cursor: pointer;
+}
+.sf-setting-mini-btn:hover { color: ${THEME.text}; background: ${THEME.surface2}; }
 .sf-toggle {
   position: relative; width: 36px; height: 20px; border-radius: 10px;
   background: ${THEME.surface2}; cursor: pointer; transition: background 0.2s ease;
@@ -2086,6 +2209,14 @@
       return SOURCE_ORDER.filter(source => this.services[source] && this._isSourceEnabled(source));
     }
 
+    _currentHostBlock() {
+      return HostService.sensitiveHostMatch(HostService.getCurrentHost(), this.settings);
+    }
+
+    _currentHostOverridden() {
+      return HostService.isHostOverridden(HostService.getCurrentHost(), this.settings);
+    }
+
     _firstEnabledSource(preferred = null) {
       if (preferred && this.services[preferred] && this._isSourceEnabled(preferred)) return preferred;
       return this._enabledSourceNames()[0] || "greasyfork";
@@ -2101,6 +2232,7 @@
     }
 
     _tabsHtml() {
+      if (this._currentHostBlock()) return "";
       this._ensureCurrentSource();
       return this._enabledSourceNames().map(source => {
         const active = source === this.currentService;
@@ -2119,6 +2251,33 @@
           </div>
         `;
       }).join("");
+    }
+
+    _privacySettingsHtml() {
+      const protectedHost = this._currentHostBlock();
+      const overridden = this._currentHostOverridden();
+      const host = HostService.getCurrentHost() || "this host";
+      const overrideLabel = overridden ? "Block this host again" : "Allow this host";
+      const overrideHelp = protectedHost
+        ? `Blocked by ${protectedHost.pattern}. Allowing this host enables source menus and searches here only.`
+        : (overridden ? "This host is currently allowed even if it matches a sensitive-host rule." : "Current host does not match the sensitive-host rules.");
+      return `
+        <div class="sf-settings-subtitle">Host privacy</div>
+        <div class="sf-setting-row">
+          <span class="sf-setting-label">Sensitive host protection</span>
+          <button class="sf-toggle ${this.settings.get('sensitiveHostProtection') ? 'on' : ''}" data-key="sensitiveHostProtection" aria-label="Sensitive host protection" aria-pressed="${this.settings.get('sensitiveHostProtection') ? 'true' : 'false'}"></button>
+        </div>
+        <div class="sf-setting-block">
+          <label class="sf-setting-label" for="sf-sensitive-hosts">Extra blocked hosts</label>
+          <textarea id="sf-sensitive-hosts" class="sf-setting-textarea" data-key="sensitiveHostPatterns" spellcheck="false" placeholder="example.com&#10;*.admin.example.com">${escapeHtml(this.settings.get('sensitiveHostPatterns') || '')}</textarea>
+          <div class="sf-setting-help">One host or wildcard pattern per line. Built-in rules already cover banks, government, identity, admin, and local network hosts.</div>
+        </div>
+        <div class="sf-setting-row">
+          <span class="sf-setting-label">${escapeHtml(host)}</span>
+          <button class="sf-setting-mini-btn sf-host-override-btn" type="button">${escapeHtml(overrideLabel)}</button>
+        </div>
+        <div class="sf-setting-help sf-host-override-help">${escapeHtml(overrideHelp)}</div>
+      `;
     }
 
     _renderTabs() {
@@ -2156,6 +2315,44 @@
       this._setupMenuCommands();
       this._updateTabs();
       if (shouldLoad) this._loadScripts();
+    }
+
+    _setCurrentHostOverride(allowed) {
+      const host = HostService.normalizeHost(HostService.getCurrentHost());
+      if (!host) return;
+      const overrides = new Set(this.settings.get("sensitiveHostOverrides") || []);
+      if (allowed) overrides.add(host);
+      else overrides.delete(host);
+      this.settings.set("sensitiveHostOverrides", [...overrides]);
+      this._syncHostPrivacyControls();
+      this._refreshHostProtection();
+    }
+
+    _syncHostPrivacyControls() {
+      if (!this.modal) return;
+      const protection = this.settings.get("sensitiveHostProtection") !== false;
+      const protectionBtn = this.modal.querySelector('.sf-toggle[data-key="sensitiveHostProtection"]');
+      if (protectionBtn) {
+        protectionBtn.classList.toggle("on", protection);
+        protectionBtn.setAttribute("aria-pressed", String(protection));
+      }
+      const block = this._currentHostBlock();
+      const overridden = this._currentHostOverridden();
+      const btn = this.modal.querySelector(".sf-host-override-btn");
+      if (btn) btn.textContent = overridden ? "Block this host again" : "Allow this host";
+      const help = this.modal.querySelector(".sf-host-override-help");
+      if (help) {
+        help.textContent = block
+          ? `Blocked by ${block.pattern}. Allowing this host enables source menus and searches here only.`
+          : (overridden ? "This host is currently allowed even if it matches a sensitive-host rule." : "Current host does not match the sensitive-host rules.");
+      }
+    }
+
+    _refreshHostProtection() {
+      this._setupMenuCommands();
+      this._renderTabs();
+      this._updateTabs();
+      if (this.isOpen) this._loadScripts();
     }
 
     // ── UI Build ────────────────────────────────────────────────────
@@ -2263,6 +2460,7 @@
               <option value="1800000" ${this.settings.get('cacheDuration')===1800000?'selected':''}>30</option>
             </select>
           </div>
+          ${this._privacySettingsHtml()}
           <div class="sf-settings-subtitle">Sources</div>
           ${this._sourceSettingsHtml()}
         </div>
@@ -2339,7 +2537,9 @@
           const val = !this.settings.get(key);
           this.settings.set(key, val);
           btn.classList.toggle("on", val);
+          btn.setAttribute("aria-pressed", String(val));
           if (key === "denseMode") this.host.classList.toggle("dense", val);
+          if (key === "sensitiveHostProtection") this._refreshHostProtection();
         });
       });
 
@@ -2347,6 +2547,16 @@
         btn.addEventListener("click", () => {
           this._setSourceEnabled(btn.dataset.source, !this._isSourceEnabled(btn.dataset.source));
         });
+      });
+
+      this.modal.querySelector(".sf-setting-textarea[data-key='sensitiveHostPatterns']")?.addEventListener("change", e => {
+        this.settings.set("sensitiveHostPatterns", e.target.value);
+        this._syncHostPrivacyControls();
+        this._refreshHostProtection();
+      });
+
+      this.modal.querySelector(".sf-host-override-btn")?.addEventListener("click", () => {
+        this._setCurrentHostOverride(!this._currentHostOverridden());
       });
 
       // Settings selects
@@ -2377,6 +2587,18 @@
 
       this._ensureCurrentSource();
       const domain = HostService.extractRootDomain(this.currentDomain);
+      const hostBlock = this._currentHostBlock();
+
+      if (hostBlock) {
+        window._sfMenuIds.push(GM_registerMenuCommand(`Script Finder blocked on ${hostBlock.host} (Settings)`, () => {
+          this._ensureUI();
+          this._open();
+        }));
+        window._sfMenuIds.push(GM_registerMenuCommand("Reset Script Finder Settings", () => {
+          GM_deleteValue("sf_settings_v4"); location.reload();
+        }));
+        return;
+      }
 
       this._enabledSourceNames().forEach(source => {
         const meta = SOURCE_META[source];
@@ -2429,6 +2651,11 @@
       this.searchInput.value = "";
       this.searchQuery = "";
       requestAnimationFrame(() => this.searchInput.focus({ preventScroll: true }));
+      const hostBlock = this._currentHostBlock();
+      if (hostBlock) {
+        this._showHostBlocked(hostBlock);
+        return;
+      }
       this._loadScripts();
     }
 
@@ -2501,6 +2728,30 @@
       if (err?.kind === "backoff") return `${label} is backing off`;
       if (err?.kind === "parse") return `${label} changed its response`;
       return `${label} unavailable`;
+    }
+
+    _showHostBlocked(hostBlock) {
+      const host = hostBlock?.host || HostService.getCurrentHost() || "this host";
+      this.allScripts = [];
+      this.sourceStatus = null;
+      this._setResultCount(0);
+      this.content.setAttribute("aria-busy", "false");
+      _safeHTML(this.content, `
+        <div class="sf-empty sf-host-blocked">
+          <div class="sf-empty-title">Search disabled on sensitive host</div>
+          <div class="sf-empty-text">No source requests will run on <strong>${escapeHtml(host)}</strong>. Matched rule: ${escapeHtml(hostBlock?.pattern || "sensitive host")}.</div>
+          <div class="sf-error-actions">
+            <button class="sf-action-btn sf-host-allow-btn" type="button">Allow this host</button>
+            <button class="sf-action-btn sf-host-settings-btn" type="button">Settings</button>
+          </div>
+        </div>
+      `);
+      this.content.querySelector(".sf-host-allow-btn")?.addEventListener("click", () => this._setCurrentHostOverride(true));
+      this.content.querySelector(".sf-host-settings-btn")?.addEventListener("click", () => {
+        this.settingsOpen = true;
+        this.modal.querySelector(".sf-settings").classList.add("visible");
+      });
+      this._syncHostPrivacyControls();
     }
 
     _recordSourceHealth(serviceName, health) {
@@ -2588,6 +2839,11 @@
 
     // ── Data ────────────────────────────────────────────────────────
     async _loadScripts() {
+      const hostBlock = this._currentHostBlock();
+      if (hostBlock) {
+        this._showHostBlocked(hostBlock);
+        return;
+      }
       if (this.isLoading) return;
       this._ensureCurrentSource();
       if (!this._isSourceEnabled(this.currentService)) {
@@ -2610,6 +2866,11 @@
         const host = HostService.getCurrentHost();
         this.currentDomain = host;
         const scripts = await svc.searchScriptsByHost(this.currentDomain, this.settings);
+        const activeHostBlock = this._currentHostBlock();
+        if (activeHostBlock) {
+          this._showHostBlocked(activeHostBlock);
+          return;
+        }
         if (activeService !== this.currentService || !this._isSourceEnabled(activeService)) return;
         this.allScripts = scripts;
         this.sourceStatus = this.allScripts?._sfStatus || null;

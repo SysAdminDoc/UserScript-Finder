@@ -97,13 +97,6 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
 
 ## Research-Driven Additions
 
-- [ ] P1 - Add sensitive-host no-fetch rules
-  Why: Per-source privacy controls do not stop all network discovery on sensitive hosts such as banks, identity pages, localhost, admin consoles, or user-defined domains.
-  Evidence: Magic Userscript+ blacklist feature; `UserScript-Finder.user.js` `@match *://*/*`, `SettingsService`, `ScriptFinder._loadScripts`.
-  Touches: `SettingsService`, menu registration, settings UI, `HostService`, source loading guards, README privacy/settings docs, tests.
-  Acceptance: Built-in and user-defined host patterns suppress source menus/tabs/fetches on matching pages, show a local-only disabled notice, and can be overridden intentionally.
-  Complexity: M
-
 - [ ] P1 - Post-filter root-domain results with metadata coverage
   Why: Registry by-site APIs often fall back to root domains, making subdomain-specific searches noisy unless candidate `@match`/`@include` metadata is checked.
   Evidence: Magic Userscript+ issue #68; `UserScript-Finder.user.js` `ScriptService.searchScriptsByHost`, `ScriptService._filter`, `MatchCoverage`.

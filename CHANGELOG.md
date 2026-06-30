@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.16.0] - 2026-06-29
+
+- Added sensitive-host protection that suppresses source menus, tabs, and network fetches on built-in or user-defined sensitive hosts, plus a per-host override flow and browser-backed coverage.
+
 ## [v1.15.0] - 2026-06-28
 
 - Added per-source privacy controls that hide disabled sources from menus/tabs, persist source choices, prevent disabled-source network requests, and cover the flow with a browser-backed source privacy test.
