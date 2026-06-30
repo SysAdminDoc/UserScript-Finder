@@ -16,8 +16,18 @@
       "current_version": {
         "version": "1.2.3",
         "reviewed": "2026-05-21T00:00:00Z",
-        "license": { "name": { "en-US": "MIT" }, "slug": "MIT" }
+        "license": { "name": { "en-US": "MIT" }, "slug": "MIT" },
+        "files": [
+          {
+            "permissions": ["storage", "tabs"],
+            "optional_permissions": ["bookmarks"],
+            "host_permissions": ["<all_urls>"]
+          }
+        ]
       },
+      "privacy_policy_url": "https://example.com/privacy",
+      "data_collection_permissions": ["Browsing activity"],
+      "promoted": { "category": "recommended" },
       "categories": ["tabs"],
       "tags": ["reddit"],
       "icon_url": "https://example.com/icon.png"

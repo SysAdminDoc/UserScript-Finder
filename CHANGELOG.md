@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.18.0] - 2026-06-30
+
+- Added extension trust badges for Chrome Web Store and Mozilla AMO results, including permission counts, broad host-access warnings, privacy policy signals, data-collection flags, promoted status, and stale-update warnings.
+
 ## [v1.17.0] - 2026-06-29
 
 - Added root-domain fallback coverage labels for GreasyFork/SleazyFork results by checking raw userscript metadata and marking exact, broad/root, or uncertain host coverage.

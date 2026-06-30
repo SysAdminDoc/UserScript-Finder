@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.17.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.18.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -79,6 +79,7 @@ Click your userscript manager icon on any website and pick a source to search:
 | **Sensitive Host Protection** | Blocks source menus and network searches on built-in sensitive hosts such as banks, government, identity, admin, localhost, and local-network pages, with per-host override controls |
 | **Match Coverage Preview** | Fetches raw userscript metadata and compares `@match` / `@include` / `@exclude` rules against the current page, including scheme, host, path, wildcard, and exclude precedence |
 | **Root Fallback Coverage Labels** | When GreasyFork/SleazyFork fall back from exact host to root domain, installable results are labeled Exact host, Broad/root match, or Coverage uncertain from raw metadata |
+| **Extension Trust Badges** | Chrome Web Store and Mozilla AMO results show permission counts, host-access warnings, privacy policy signals, data-collection flags, promoted status, and stale-update warnings when metadata exposes them |
 | **Smart Sorting** | Sort by daily installs, total installs, ratings, fan score, author reputation, last update, or creation date |
 | **Curated Catalogs** | Searches Awesome Userscripts and Tampermonkey's Userscript.Zone handoff for domain-matched recommendations |
 | **GitHub Integration** | Searches repos and Gists matching `{domain} userscript/tampermonkey/greasemonkey`, shows stars and forks |
@@ -99,8 +100,8 @@ Click your userscript manager icon on any website and pick a source to search:
 | **GreasyFork** | `/scripts/by-site/{domain}.json` with search fallback | Scripts tagged for the current domain | Daily installs, total installs, ratings, fan score |
 | **SleazyFork** | Same API, different host | Adult-content scripts for the current domain | Same as GreasyFork |
 | **OpenUserJS** | `/?q={domain}` HTML search | OpenUserJS scripts matching the current domain | Installs, ratings, last update |
-| **Chrome Web Store** | `/search/{domain}` embedded result data | Chrome extensions matching the current domain | Users, rating, rating count, last update |
-| **Mozilla AMO** | `/api/v5/addons/search/` | Firefox extensions matching the current domain | Users, rating, rating count, last update |
+| **Chrome Web Store** | `/search/{domain}` embedded result data | Chrome extensions matching the current domain | Users, rating, rating count, last update, permissions, host access, privacy/data flags |
+| **Mozilla AMO** | `/api/v5/addons/search/` | Firefox extensions matching the current domain | Users, rating, rating count, last update, permissions, host access, privacy/data flags, promoted status |
 | **Catalogs** | Awesome Userscripts README + Tampermonkey `scripts.php` | Curated userscripts and Userscript.Zone handoff for the current domain | Catalog source, category |
 | **GitHub Gists** | `gist.github.com/search` HTML search | Gists matching `{domain} userscript` | Files, stars, forks, last active |
 | **GitHub** | `api.github.com/search/repositories` | Repos matching `{domain} userscript` | Stars, forks, language |

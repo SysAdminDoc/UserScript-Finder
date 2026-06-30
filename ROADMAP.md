@@ -97,13 +97,6 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
 
 ## Research-Driven Additions
 
-- [ ] P1 - Show extension permission and privacy badges
-  Why: Extension alternatives can be higher risk than userscripts; AMO and store pages expose permissions, host permissions, privacy policies, data-collection signals, and promoted status that are currently discarded.
-  Evidence: Mozilla Add-ons API search response; Chrome Web Store/Edge Add-ons store metadata; `ChromeWebStoreService`, `MozillaAddonsService`.
-  Touches: store adapters, result normalization, badge rendering, sorting/trust helpers, adapter fixtures, README source table.
-  Acceptance: Chrome/Firefox extension results display concise permission/privacy/trust badges and warn on `<all_urls>`, broad host access, missing privacy policy, or stale update dates.
-  Complexity: M
-
 - [ ] P1 - Add manager compatibility and degraded-mode checks
   Why: README claims Tampermonkey, Violentmonkey, and Greasemonkey support, but manager APIs and strict CSP/Trusted Types behavior vary across managers and browsers.
   Evidence: Magic Userscript+ known issues and https://github.com/magicoflolis/Userscript-Plus/issues/71; https://github.com/Tampermonkey/tampermonkey/issues/2800; https://github.com/Tampermonkey/tampermonkey/issues/2814; `UserScript-Finder.user.js` GM API use and Trusted Types policy.

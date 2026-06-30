@@ -89,7 +89,16 @@ function assertShape(item, source) {
       english: hooks.looksEnglish({ name: "Reddit Helper", description: "English text" }),
       nonEnglish: hooks.looksEnglish({ name: "帮助", description: "脚本" }),
       reputationOrder: hooks.reputationScore({ total_installs: 1000, good_ratings: 5 }) >
-        hooks.reputationScore({ total_installs: 1, good_ratings: 0 })
+        hooks.reputationScore({ total_installs: 1, good_ratings: 0 }),
+      broadHostAccess: hooks.hasBroadHostAccess(["<all_urls>"]),
+      chromeTrust: hooks.extensionTrustBadges(chrome, Date.parse("2026-06-29T00:00:00Z")),
+      mozillaTrust: hooks.extensionTrustBadges(mozilla, Date.parse("2026-06-29T00:00:00Z")),
+      staleMissingPrivacyTrust: hooks.extensionTrustBadges({
+        _source: "mozillaaddons",
+        _permissions: ["storage"],
+        _host_permissions: ["https://example.com/*"],
+        code_updated_at: "2020-01-01T00:00:00Z"
+      }, Date.parse("2026-06-29T00:00:00Z"))
     };
 
     return { greasy, openuserjs, chrome, mozilla, github, catalogs, gist, helperChecks };
@@ -110,8 +119,16 @@ function assertShape(item, source) {
   assert.equal(result.openuserjs.code_url, "https://openuserjs.org/install/alice/OUJS_Reddit_Helper.user.js");
   assertShape(result.chrome, "chromewebstore");
   assert.equal(result.chrome.name, "Chrome Reddit Helper");
+  assert.deepEqual(result.chrome._permissions, ["storage", "tabs"]);
+  assert.deepEqual(result.chrome._host_permissions, ["<all_urls>"]);
+  assert.equal(result.chrome._privacy_policy_url, "https://example.com/privacy");
+  assert.deepEqual(result.chrome._data_collection, ["Browsing history"]);
   assertShape(result.mozilla, "mozillaaddons");
   assert.equal(result.mozilla.license, "MIT");
+  assert.deepEqual(result.mozilla._permissions, ["storage", "tabs"]);
+  assert.deepEqual(result.mozilla._optional_permissions, ["bookmarks"]);
+  assert.deepEqual(result.mozilla._host_permissions, ["<all_urls>"]);
+  assert.equal(result.mozilla._promoted, "recommended");
   assertShape(result.github, "github");
   assert.equal(result.github._stars, 77);
   assert.equal(result.catalogs.length, 2);
@@ -122,6 +139,13 @@ function assertShape(item, source) {
   assert.equal(result.helperChecks.english, true);
   assert.equal(result.helperChecks.nonEnglish, false);
   assert.equal(result.helperChecks.reputationOrder, true);
+  assert.equal(result.helperChecks.broadHostAccess, true);
+  assert.ok(result.helperChecks.chromeTrust.some(badge => badge.text === "All sites" && badge.cls === "trust-bad"));
+  assert.ok(result.helperChecks.chromeTrust.some(badge => badge.text === "Privacy" && badge.cls === "trust-ok"));
+  assert.ok(result.helperChecks.chromeTrust.some(badge => badge.text === "Data" && badge.cls === "trust-warn"));
+  assert.ok(result.helperChecks.mozillaTrust.some(badge => badge.text === "Recommended" && badge.cls === "trust-ok"));
+  assert.ok(result.helperChecks.staleMissingPrivacyTrust.some(badge => badge.text === "No privacy" && badge.cls === "trust-warn"));
+  assert.ok(result.helperChecks.staleMissingPrivacyTrust.some(badge => badge.text === "Stale" && badge.cls === "trust-bad"));
 
   await browser.close();
   console.log("adapter contract tests passed");

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.17.0
+// @version      1.18.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -260,6 +260,162 @@
     const latin = (text.match(/[A-Za-z]/g) || []).length;
     const nonLatin = (text.match(/[^\x00-\x7F]/g) || []).length;
     return nonLatin === 0 || latin / Math.max(latin + nonLatin, 1) >= 0.8;
+  }
+
+  function normalizeStringList(value) {
+    const items = [];
+    const add = item => {
+      if (item === null || item === undefined || item === false) return;
+      if (Array.isArray(item)) {
+        item.forEach(add);
+        return;
+      }
+      if (typeof item === "object") {
+        Object.values(item).forEach(add);
+        return;
+      }
+      String(item).split(/\r?\n|,\s*/).forEach(part => {
+        const text = part.replace(/\s+/g, " ").trim();
+        if (text) items.push(text);
+      });
+    };
+    add(value);
+    return Array.from(new Set(items));
+  }
+
+  function firstString(...values) {
+    for (const value of values) {
+      if (value === null || value === undefined || value === false) continue;
+      if (Array.isArray(value)) {
+        const found = firstString(...value);
+        if (found) return found;
+        continue;
+      }
+      if (typeof value === "object") {
+        const found = firstString(...Object.values(value));
+        if (found) return found;
+        continue;
+      }
+      const text = String(value).replace(/\s+/g, " ").trim();
+      if (text) return text;
+    }
+    return null;
+  }
+
+  function isExtensionHostPermission(permission) {
+    const text = String(permission || "").trim().toLowerCase();
+    return text === "<all_urls>" || /^(\*|https?|file|ftp):\/\//.test(text);
+  }
+
+  function hasBroadHostAccess(hostPermissions) {
+    return normalizeStringList(hostPermissions).some(permission => {
+      const text = permission.toLowerCase().replace(/\s+/g, "");
+      return text === "<all_urls>" ||
+        text === "*://*/*" ||
+        text === "*://*" ||
+        text === "http://*/*" ||
+        text === "https://*/*" ||
+        /^(\*|https?):\/\/\*\//.test(text);
+    });
+  }
+
+  function splitExtensionPermissions(permissions, hostPermissions = []) {
+    const direct = normalizeStringList(permissions);
+    const explicitHosts = normalizeStringList(hostPermissions);
+    return {
+      permissions: direct.filter(permission => !isExtensionHostPermission(permission)),
+      hostPermissions: Array.from(new Set([
+        ...explicitHosts,
+        ...direct.filter(isExtensionHostPermission)
+      ]))
+    };
+  }
+
+  function listSummary(label, values) {
+    const list = normalizeStringList(values);
+    const shown = list.slice(0, 6).join(", ");
+    const suffix = list.length > 6 ? `, +${list.length - 6} more` : "";
+    return `${label}: ${shown}${suffix}`;
+  }
+
+  function extensionTrustBadges(script, now = Date.now()) {
+    const permissions = normalizeStringList(script?._permissions);
+    const optionalPermissions = normalizeStringList(script?._optional_permissions);
+    const hostPermissions = normalizeStringList(script?._host_permissions);
+    const dataCollection = normalizeStringList(script?._data_collection);
+    const privacyPolicy = firstString(script?._privacy_policy_url);
+    const promoted = firstString(script?._promoted);
+    const badges = [];
+
+    if (permissions.length) {
+      badges.push({
+        icon: "gear",
+        text: `${permissions.length} ${permissions.length === 1 ? "perm" : "perms"}`,
+        title: listSummary("Permissions", permissions),
+        cls: "trust-info"
+      });
+    }
+
+    if (optionalPermissions.length) {
+      badges.push({
+        icon: "gear",
+        text: `${optionalPermissions.length} optional`,
+        title: listSummary("Optional permissions", optionalPermissions),
+        cls: "trust-info"
+      });
+    }
+
+    if (hostPermissions.length) {
+      const broad = hasBroadHostAccess(hostPermissions);
+      badges.push({
+        icon: "search",
+        text: broad ? "All sites" : `${hostPermissions.length} ${hostPermissions.length === 1 ? "host" : "hosts"}`,
+        title: listSummary("Host permissions", hostPermissions),
+        cls: broad ? "trust-bad" : "trust-warn"
+      });
+    }
+
+    badges.push(privacyPolicy ? {
+      icon: "scales",
+      text: "Privacy",
+      title: `Privacy policy: ${privacyPolicy}`,
+      cls: "trust-ok"
+    } : {
+      icon: "scales",
+      text: "No privacy",
+      title: "No privacy policy was found in the extension metadata.",
+      cls: "trust-warn"
+    });
+
+    if (dataCollection.length) {
+      badges.push({
+        icon: "eyeSlash",
+        text: "Data",
+        title: listSummary("Data collection", dataCollection),
+        cls: "trust-warn"
+      });
+    }
+
+    if (promoted) {
+      badges.push({
+        icon: "star",
+        text: String(promoted).toLowerCase() === "recommended" ? "Recommended" : "Promoted",
+        title: `Store status: ${promoted}`,
+        cls: "trust-ok"
+      });
+    }
+
+    const updatedAt = Date.parse(script?.code_updated_at || "");
+    if (Number.isFinite(updatedAt) && now - updatedAt > 730 * 24 * 60 * 60 * 1000) {
+      badges.push({
+        icon: "clockwise",
+        text: "Stale",
+        title: "Extension metadata has not been updated in more than two years.",
+        cls: "trust-bad"
+      });
+    }
+
+    return badges;
   }
 
   const MatchCoverage = {
@@ -1043,6 +1199,12 @@
       if (!id || !name) return null;
 
       const manifest = this._parseManifest(record[18]);
+      const manifestPermissions = splitExtensionPermissions(manifest.permissions, [
+        manifest.host_permissions,
+        manifest.optional_host_permissions,
+        (manifest.content_scripts || []).map(script => script?.matches || [])
+      ]);
+      const optionalPermissions = splitExtensionPermissions(manifest.optional_permissions);
       const updated = Array.isArray(record[17]) && Number.isFinite(record[17][0])
         ? new Date((record[17][0] * 1000) + Math.round((record[17][1] || 0) / 1000000)).toISOString()
         : null;
@@ -1067,7 +1229,13 @@
         _category: Array.isArray(record[11]) ? record[11][0] : null,
         _image: record[1] || null,
         _full_name: id,
-        _topics: []
+        _topics: [],
+        _permissions: manifestPermissions.permissions,
+        _optional_permissions: optionalPermissions.permissions,
+        _host_permissions: manifestPermissions.hostPermissions,
+        _privacy_policy_url: firstString(manifest.privacy_policy_url, manifest.privacy_policy),
+        _data_collection: normalizeStringList(manifest.data_collection || manifest.dataCollection || manifest.data_collection_permissions),
+        _promoted: firstString(manifest.promoted_status, manifest.promoted, manifest.featured ? "Featured" : null)
       };
     }
 
@@ -1144,6 +1312,17 @@
       const weeklyDownloads = Number(addon.weekly_downloads);
       const author = addon.authors?.[0]?.name || addon.authors?.[0]?.username || null;
       const license = addon.current_version?.license;
+      const currentFile = Array.isArray(addon.current_version?.files) ? addon.current_version.files[0] : null;
+      const requiredPermissions = splitExtensionPermissions([addon.permissions, currentFile?.permissions], [
+        addon.host_permissions,
+        currentFile?.host_permissions,
+        currentFile?.origins,
+        currentFile?.matches
+      ]);
+      const optionalPermissions = splitExtensionPermissions([addon.optional_permissions, currentFile?.optional_permissions], [
+        addon.optional_host_permissions,
+        currentFile?.optional_host_permissions
+      ]);
 
       return {
         _source: "mozillaaddons",
@@ -1166,7 +1345,13 @@
         _category: addon.categories?.[0] || null,
         _image: addon.icon_url || null,
         _full_name: addon.slug || String(addon.id || ""),
-        _topics: [...(addon.tags || []), ...(addon.categories || [])]
+        _topics: [...(addon.tags || []), ...(addon.categories || [])],
+        _permissions: requiredPermissions.permissions,
+        _optional_permissions: optionalPermissions.permissions,
+        _host_permissions: [...requiredPermissions.hostPermissions, ...optionalPermissions.hostPermissions],
+        _privacy_policy_url: firstString(addon.privacy_policy_url, addon.privacy_policy, addon.privacy?.policy_url),
+        _data_collection: normalizeStringList(addon.data_collection_permissions || addon.data_collection || addon.privacy?.data_collection || currentFile?.data_collection_permissions),
+        _promoted: firstString(addon.promoted?.category, addon.promoted?.name)
       };
     }
 
@@ -1655,7 +1840,10 @@
       GitHubGistService,
       reputationScore,
       normalizedRating,
-      looksEnglish
+      looksEnglish,
+      extensionTrustBadges,
+      normalizeStringList,
+      hasBroadHostAccess
     });
   }
 
@@ -2070,6 +2258,10 @@
 .sf-badge.coverage-exact { background: ${THEME.green}18; color: ${THEME.green}; border-color: ${THEME.green}33; }
 .sf-badge.coverage-broad { background: ${THEME.yellow}18; color: ${THEME.yellow}; border-color: ${THEME.yellow}33; }
 .sf-badge.coverage-uncertain { background: ${THEME.surface2}; color: ${THEME.subtext1}; border-color: ${THEME.glassBorder}; }
+.sf-badge.trust-ok { background: ${THEME.green}18; color: ${THEME.green}; border-color: ${THEME.green}33; }
+.sf-badge.trust-info { background: ${THEME.blue}18; color: ${THEME.blue}; border-color: ${THEME.blue}33; }
+.sf-badge.trust-warn { background: ${THEME.yellow}18; color: ${THEME.yellow}; border-color: ${THEME.yellow}33; }
+.sf-badge.trust-bad { background: ${THEME.red}18; color: ${THEME.red}; border-color: ${THEME.red}33; }
 
 /* Loading / empty / error */
 .sf-loading { padding: 50px 20px; text-align: center; display: grid; gap: 14px; place-items: center; }
@@ -3225,11 +3417,13 @@
         const totalUsers = formatNumber(script.total_installs);
         const rating = script._rating != null ? Number(script._rating).toFixed(1) : null;
         const ratingCount = formatNumber(script._rating_count);
+        const trustBadges = extensionTrustBadges(script);
         metaHtml = `
           ${badge("chartBar", totalUsers, "Users")}
           ${badge("star", rating, "Average rating")}
           ${badge("user", ratingCount, "Rating count")}
           ${badge("clockwise", updated, "Updated")}
+          ${trustBadges.map(trust => badge(trust.icon, trust.text, trust.title, trust.cls)).join("")}
         `;
       } else {
         metaHtml = `
