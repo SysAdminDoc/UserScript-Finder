@@ -182,3 +182,33 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
   Touches: source runtime scheduler, dedupe helper, result grouping UI, source health footer, privacy controls, adapter fixtures.
   Acceptance: An All view queries enabled sources within existing privacy/timeouts, groups duplicate install/view URLs, shows per-source health, and preserves source-specific tabs for focused troubleshooting.
   Complexity: L
+
+## Research-Driven Additions
+
+- [ ] P1 - Reconcile stale legacy roadmap rows
+  Why: `ROADMAP.md` still lists shipped install and author-reputation work, which can send dev agents back into completed behavior.
+  Evidence: `ROADMAP.md:8`, `ROADMAP.md:18`; `README.md:72`; `CHANGELOG.md` v1.6.0 and v1.10.0.
+  Touches: `ROADMAP.md` after verification against `UserScript-Finder.user.js`, `README.md`, and `CHANGELOG.md`.
+  Acceptance: Completed legacy rows are deleted or rewritten into still-incomplete variants; remaining roadmap entries do not duplicate v1.0-v1.19 changelog items.
+  Complexity: S
+
+- [ ] P2 - Add live fixture refresh for source parser drift
+  Why: Registry/store HTML and API shapes change, and current fixtures prove known parser shapes but do not provide a safe refresh path.
+  Evidence: `tests/fixtures/`; live Greasy Fork, AMO, Edge autocomplete, and Userstyles.World endpoints; Magic Userscript+ issues #58, #71.
+  Touches: fixture refresh script, `tests/fixtures/`, adapter contract tests, portable test runner, README verification docs.
+  Acceptance: A local command fetches redacted sample responses for enabled sources into fixtures, parser tests fail on schema drift, and no credentials or user data are written.
+  Complexity: M
+
+- [ ] P2 - Add UI string catalog for localization-ready menus and modal text
+  Why: Competitors already centralize i18n, while this project keeps user-facing menu/settings/toast/empty-state strings inline across the modal constructor and render helpers.
+  Evidence: Find Scripts For This Site README; Violentmonkey issue #2549; quoid/userscripts issue #919; `UserScript-Finder.user.js:2606-2850`, `3305-3418`.
+  Touches: string catalog helper, menu labels, settings/errors/toasts, accessibility markup tests, README feature docs.
+  Acceptance: Static user-facing strings resolve through an English default catalog, tests cover representative menu/modal labels, and locale-aware filtering remains a separate existing roadmap item.
+  Complexity: M
+
+- [ ] P2 - Capture live manager and browser compatibility matrix
+  Why: v1.19 added runtime compatibility diagnostics, but support claims still need dated live proof across managers and browsers.
+  Evidence: `CHANGELOG.md` v1.19.0; Tampermonkey and Violentmonkey GM metadata docs; quoid/userscripts Safari issues; ScriptCat compatibility issues.
+  Touches: README compatibility table, manager compatibility smoke script or checklist, diagnostics fixtures, release verification notes.
+  Acceptance: README lists tested manager/browser/version combinations with the exact degraded capabilities observed, and each unsupported capability maps to a `ManagerCompatibility` warning.
+  Complexity: M
