@@ -2144,6 +2144,9 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid ${THEME.green}; outline-offset: 2px;
+}
 
 /* ── TOAST ── */
 .sf-toast {
@@ -2483,10 +2486,10 @@
 .sf-badge.score-mid { background: ${THEME.yellow}18; color: ${THEME.yellow}; border-color: ${THEME.yellow}33; }
 .sf-badge.score-low { background: ${THEME.red}18; color: ${THEME.red}; border-color: ${THEME.red}33; }
 .sf-badge.stale-flag { background: ${THEME.red}18; color: ${THEME.red}; border-color: ${THEME.red}33; }
-.sf-queue-btn { background: none; border: none; color: ${THEME.overlay}; cursor: pointer; padding: 4px; border-radius: 6px; transition: color 0.15s, background 0.15s; flex-shrink: 0; }
+.sf-queue-btn { background: none; border: none; color: ${THEME.overlay}; cursor: pointer; padding: 8px; border-radius: 6px; transition: color 0.15s, background 0.15s; flex-shrink: 0; }
 .sf-queue-btn:hover { color: ${THEME.yellow}; background: ${THEME.yellow}18; }
 .sf-queue-btn.queued { color: ${THEME.yellow}; }
-.sf-dismiss-btn { background: none; border: none; color: ${THEME.overlay}; cursor: pointer; padding: 4px; border-radius: 6px; transition: color 0.15s, background 0.15s; flex-shrink: 0; }
+.sf-dismiss-btn { background: none; border: none; color: ${THEME.overlay}; cursor: pointer; padding: 8px; border-radius: 6px; transition: color 0.15s, background 0.15s; flex-shrink: 0; }
 .sf-dismiss-btn:hover { color: ${THEME.red}; background: ${THEME.red}18; }
 .sf-source-badge { font: 600 10px/1 inherit; padding: 2px 6px; border-radius: 4px; background: ${THEME.surface1}; color: ${THEME.subtext0}; }
 .sf-source-badge.sleazyfork { color: ${THEME.purple}; }
