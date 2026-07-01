@@ -844,6 +844,15 @@
       const text = String(source || "");
       const block = text.match(/==UserScript==([\s\S]{0,12000}?)==\/UserScript==/i);
       return !!(block && /\/\/\s*@name\s+\S+/i.test(block[1]));
+    },
+
+    dangerousGrants(source) {
+      const dangerous = ["GM_xmlhttpRequest", "GM.xmlHttpRequest", "unsafeWindow", "window.close", "window.focus"];
+      const text = String(source || "");
+      const block = text.match(/==UserScript==([\s\S]{0,12000}?)==\/UserScript==/i);
+      if (!block) return [];
+      const grants = [...block[1].matchAll(/\/\/\s*@grant\s+(\S+)/gi)].map(m => m[1]);
+      return grants.filter(g => dangerous.includes(g));
     }
   };
 
@@ -3844,6 +3853,10 @@
         if (!InstallSafety.hasUserScriptMetadata(source)) {
           this.toast.show("Install blocked: .user.js metadata block missing.");
           return;
+        }
+        const dangerousGrants = InstallSafety.dangerousGrants(source);
+        if (dangerousGrants.length) {
+          this.toast.show(`Warning: requests ${dangerousGrants.join(", ")}`);
         }
         this._openUrl(validation.url);
       } catch(err) {
