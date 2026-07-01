@@ -1,18 +1,8 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const Module = require("node:module");
-
-const runtimeNodeModules = "C:/Users/--/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules";
-process.env.NODE_PATH = [
-  runtimeNodeModules,
-  `${runtimeNodeModules}/.pnpm/node_modules`,
-  `${runtimeNodeModules}/playwright/node_modules`,
-  process.env.NODE_PATH || ""
-].filter(Boolean).join(path.delimiter);
-Module._initPaths();
-
-const { chromium } = require("playwright");
+const { resolvePlaywright } = require("./helpers/playwright-setup.cjs");
+const { chromium } = resolvePlaywright();
 
 const repoRoot = path.resolve(__dirname, "..");
 const fixtureRoot = path.join(__dirname, "fixtures");

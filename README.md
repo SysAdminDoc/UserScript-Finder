@@ -188,6 +188,15 @@ A: The dark OLED theme is baked in — no light mode. This is intentional.
 
 [MIT](LICENSE) — permissive open-source license.
 
+## Verification
+
+```bash
+npm install
+npm test
+```
+
+Runs 13 tests covering adapter contracts, install safety, match coverage, host normalization, accessibility markup, diagnostics markup, source privacy, sensitive host protection, network disclosure, manager compatibility, root fallback coverage, source runtime, and `@connect` allowlist consistency.
+
 ## Contributing
 
 Issues and PRs welcome. [Open an issue](https://github.com/SysAdminDoc/UserScript-Finder/issues) for bugs or feature requests.

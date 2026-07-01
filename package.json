@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "name": "userscript-finder",
+  "version": "1.20.0",
+  "description": "Finds userscripts and extension alternatives for the current domain",
+  "scripts": {
+    "test": "node tests/run-all.cjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  },
+  "license": "MIT"
+}
