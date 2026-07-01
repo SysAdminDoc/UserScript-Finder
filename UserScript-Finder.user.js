@@ -2284,6 +2284,12 @@
   align-items: center; gap: 8px;
 }
 .sf-sort-label { font: 600 12px/1 inherit; color: ${THEME.subtext0}; flex-shrink: 0; }
+.sf-query-mode-select {
+  padding: 7px 10px; border-radius: 8px;
+  border: 1px solid ${THEME.glassBorder}; background: ${THEME.surface0};
+  color: ${THEME.text}; font: 500 12px/1 inherit; cursor: pointer; outline: none;
+}
+.sf-query-mode-select option { background: ${THEME.surface1}; color: ${THEME.text}; }
 .sf-sort-select {
   flex: 1; padding: 7px 10px; border-radius: 8px;
   border: 1px solid ${THEME.glassBorder}; background: ${THEME.surface0};
@@ -2610,6 +2616,8 @@
   .sf-modal-header { padding: 14px 16px; }
   .sf-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 8px 16px; }
   .sf-sort-bar, .sf-search-wrap { padding-left: 16px; padding-right: 16px; }
+  .sf-sort-bar { flex-wrap: wrap; }
+  .sf-sort-bar .sf-sort-label:first-child { display: none; }
   .sf-filter-bar { grid-template-columns: 1fr 1fr; padding-left: 16px; padding-right: 16px; }
   .sf-filter-bar .sf-sort-label { display: none; }
   .sf-item { padding: 12px 16px; }
@@ -2634,6 +2642,7 @@
       this.currentService = this._firstEnabledSource(this.settings.get("lastService") || "greasyfork");
       this.currentSort = this.settings.get("defaultSort");
       this.filters = { updatedMonths: "any", minRating: "any", languageFilter: "any" };
+      this.queryMode = this.settings.get("queryMode") || "auto";
       this.currentDomain = HostService.getCurrentHost();
       this.isOpen = false;
       this.isLoading = false;
@@ -2899,6 +2908,13 @@
           ${this._tabsHtml()}
         </div>
         <div class="sf-sort-bar">
+          <span class="sf-sort-label">Search</span>
+          <select class="sf-query-mode-select" aria-label="Search mode">
+            <option value="auto">Auto (domain)</option>
+            <option value="exact">Exact host</option>
+            <option value="root">Root domain</option>
+            <option value="keyword">Keyword</option>
+          </select>
           <span class="sf-sort-label">Sort by</span>
           <select class="sf-sort-select" aria-label="Sort results">
             <option value="daily">Daily installs</option>
@@ -3013,6 +3029,17 @@
           this._loadScripts();
         }
       });
+
+      // Query mode
+      this.queryModeSelect = this.modal.querySelector(".sf-query-mode-select");
+      if (this.queryModeSelect) {
+        this.queryModeSelect.value = this.queryMode;
+        this.queryModeSelect.addEventListener("change", e => {
+          this.queryMode = e.target.value;
+          this.settings.set("queryMode", this.queryMode);
+          this._loadScripts();
+        });
+      }
 
       // Sort
       this.sortSelect.addEventListener("change", e => {
@@ -3542,6 +3569,15 @@
       });
     }
 
+    _resolveQueryHost(host) {
+      switch (this.queryMode) {
+        case "exact": return HostService.normalizeHost(host);
+        case "root": return HostService.extractRootDomain(host);
+        case "keyword": return HostService.extractRootDomain(host).split(".")[0];
+        default: return host;
+      }
+    }
+
     // ── Data ────────────────────────────────────────────────────────
     async _loadScripts() {
       this.compatibility = ManagerCompatibility.report();
@@ -3575,7 +3611,8 @@
       try {
         const host = HostService.getCurrentHost();
         this.currentDomain = host;
-        const scripts = await svc.searchScriptsByHost(this.currentDomain, this.settings);
+        const queryHost = this._resolveQueryHost(host);
+        const scripts = await svc.searchScriptsByHost(queryHost, this.settings);
         const activeHostBlock = this._currentHostBlock();
         if (activeHostBlock) {
           this._showHostBlocked(activeHostBlock);
