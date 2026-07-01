@@ -2967,7 +2967,7 @@
           ${this._tabsHtml()}
         </div>
         <div class="sf-sort-bar">
-          <span class="sf-sort-label">Search</span>
+          <span class="sf-sort-label">Mode</span>
           <select class="sf-query-mode-select" aria-label="Search mode">
             <option value="auto">Auto (domain)</option>
             <option value="exact">Exact host</option>
@@ -3345,8 +3345,13 @@
       const footerLink = this.modal.querySelector(".sf-footer a");
       if (footerLink) {
         svcNames.forEach(s => footerLink.classList.toggle(s, s === svc));
-        footerLink.textContent = SOURCE_META[svc]?.label || svc;
-        footerLink.href = SOURCE_META[svc]?.footerUrl || "#";
+        if (svc === "_all") {
+          footerLink.textContent = "All sources";
+          footerLink.removeAttribute("href");
+        } else {
+          footerLink.textContent = SOURCE_META[svc]?.label || svc;
+          footerLink.href = SOURCE_META[svc]?.footerUrl || "#";
+        }
       }
       this._updateHealthUi();
     }
@@ -3354,7 +3359,7 @@
     _setResultCount(count) {
       const countEl = this.modal.querySelector(".sf-subtitle-count");
       const textEl = this.modal.querySelector(".sf-subtitle-text");
-      const unit = SOURCE_META[this.currentService]?.unit || "script";
+      const unit = this.currentService === "_all" ? "result" : (SOURCE_META[this.currentService]?.unit || "script");
       if (countEl) countEl.textContent = count || 0;
       if (textEl) textEl.textContent = count === 1 ? `${unit} found` : `${unit}s found`;
     }
@@ -3786,7 +3791,7 @@
     _displayScripts() {
       let scripts = this.allScripts || [];
       const svcClass = this._serviceClass(this.currentService);
-      const svcLabel = SOURCE_META[this.currentService]?.label || "Source";
+      const svcLabel = this.currentService === "_all" ? "all sources" : (SOURCE_META[this.currentService]?.label || "Source");
       const displayHost = HostService.extractRootDomain(this.currentDomain);
       const noticeHtml = this._sourceNoticeHtml();
 
