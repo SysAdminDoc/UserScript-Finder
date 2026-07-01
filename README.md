@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.23.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.24.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -93,6 +93,7 @@ Click your userscript manager icon on any website and pick a source to search:
 | **Manager Compatibility Checks** | Detects missing GM menu, network, storage, tab, and Trusted Types capabilities at runtime and shows an actionable degraded-mode report instead of failing silently |
 | **Cross-Tab Settings Sync** | Settings changes propagate to other open tabs via `GM_addValueChangeListener` with polling fallback |
 | **Dismissed Scripts** | Dismiss results you don't want with per-domain persistence and a "Show all" restore button |
+| **Queue to Try** | Bookmark scripts to try later across any domain with a persistent queue stored in userscript manager storage |
 | **Persistent Preferences** | Remembers your last-used source, sort order, dense mode, and cache duration |
 | **Domain-Aware** | Automatically detects the current site and strips `www.`/`m.`/`mobile.` prefixes |
 | **Public-Suffix Aware Matching** | Normalizes common multi-label and hosted suffixes such as `co.uk`, `com.au`, `github.io`, `pages.dev`, and `netlify.app` before root-domain fallback |

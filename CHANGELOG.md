@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.24.0] - 2026-07-01
+
+- Added cross-domain "Queue to try" list with a calendar button on each result that toggles scripts into a persistent queue stored via GM_setValue.
+
 ## [v1.23.0] - 2026-07-01
 
 - Added per-domain dismissed scripts with a dismiss button on each result, persistent hidden-script storage via GM_setValue, and a "Show all" restore button at the bottom of filtered results.
