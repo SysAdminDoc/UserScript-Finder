@@ -293,6 +293,7 @@
     if (isNaN(d.getTime())) return null;
     const now = Date.now();
     const diff = now - d.getTime();
+    if (diff < 0) return 'just now';
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'just now';
     if (mins < 60) return `${mins}m ago`;
@@ -2707,6 +2708,7 @@
       this.settingsOpen = false;
       this.previousFocus = null;
       this.uiBuilt = false;
+      this._allLoadGen = 0;
       this.compatibility = ManagerCompatibility.report();
     }
 
@@ -3626,7 +3628,7 @@
     }
 
     async _loadAllSources() {
-      this.isLoading = false;
+      const loadId = ++this._allLoadGen;
       this.content.setAttribute("aria-busy", "true");
       _safeHTML(this.content, `<div class="sf-loading"><div class="sf-spinner"></div><div class="sf-loading-text">${STRINGS.loadingAllSources}</div></div>`);
 
@@ -3655,6 +3657,10 @@
       });
 
       const allResults = await Promise.all(promises);
+      if (this.currentService !== "_all" || loadId !== this._allLoadGen) {
+        this.content.setAttribute("aria-busy", "false");
+        return;
+      }
       for (const batch of allResults) {
         for (const script of batch) {
           const key = script.url || script.code_url || script._full_name || script.name;
@@ -3665,7 +3671,6 @@
         }
       }
 
-      if (this.currentService !== "_all") return;
       this.allScripts = results;
       this.sourceStatus = null;
       this._setResultCount(results.length);
@@ -3817,7 +3822,8 @@
       this.searchCount.textContent = constrained ? `${scripts.length}/${this.allScripts.length}` : "";
 
       if (!scripts.length) {
-        const directUrl = this.services[this.currentService].getDirectSearchUrl(this.currentDomain);
+        const svc = this.services[this.currentService];
+        const directUrl = svc ? svc.getDirectSearchUrl(this.currentDomain) : "#";
         if (this.searchQuery) {
           _safeHTML(this.content, `${noticeHtml}<div class="sf-empty"><div class="sf-empty-title">No matches</div><div class="sf-empty-text">No scripts match "${escapeHtml(this.searchQuery)}"</div></div>`);
         } else if (this._hasActiveFilters()) {
@@ -3839,6 +3845,7 @@
       const sorted = this._sortScripts(scripts);
       this._setResultCount(this.allScripts.length);
 
+      if (this._chunkTimer) { cancelAnimationFrame(this._chunkTimer); this._chunkTimer = null; }
       _safeHTML(this.content, noticeHtml);
       this._renderChunked(sorted, svcClass);
     }
@@ -4030,11 +4037,13 @@
         request({
           method: "GET", url: validation.url,
           headers: { Accept: "text/plain,*/*" },
+          timeout: SourceRuntime.timeoutMs,
           onload: r => {
             if (r.status >= 200 && r.status < 300) resolve(r.responseText || "");
             else reject(new Error(`Preview HTTP ${r.status}`));
           },
-          onerror: reject
+          onerror: () => reject(new Error("Preview network request failed")),
+          ontimeout: () => reject(new Error("Preview timed out"))
         });
       });
     }
