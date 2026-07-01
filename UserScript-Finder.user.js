@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.19.0
+// @version      1.20.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -76,6 +76,16 @@
     githubgist: { label: "GitHub Gists", tab: "Gists", menuKind: "Scripts", menuName: "GitHub Gists", footerUrl: "https://gist.github.com", unit: "gist" },
     github: { label: "GitHub", tab: "GitHub", menuKind: "Scripts", menuName: "GitHub", footerUrl: "https://github.com", unit: "repo" }
   };
+  const SOURCE_CONNECT = {
+    greasyfork: ["greasyfork.org", "update.greasyfork.org"],
+    sleazyfork: ["sleazyfork.org"],
+    openuserjs: ["openuserjs.org"],
+    chromewebstore: ["chromewebstore.google.com"],
+    mozillaaddons: ["addons.mozilla.org"],
+    catalogs: ["raw.githubusercontent.com", "www.tampermonkey.net"],
+    githubgist: ["gist.github.com", "gist.githubusercontent.com"],
+    github: ["api.github.com"]
+  };
   const SOURCE_ORDER = Object.keys(SOURCE_META);
   const DEFAULT_SOURCE_SETTINGS = SOURCE_ORDER.reduce((settings, source) => {
     settings[source] = true;
@@ -142,7 +152,8 @@
     sources: DEFAULT_SOURCE_SETTINGS,
     sensitiveHostProtection: true,
     sensitiveHostPatterns: "",
-    sensitiveHostOverrides: []
+    sensitiveHostOverrides: [],
+    disclosureAckedSources: []
   };
 
   // ── Catppuccin Mocha + OLED palette ─────────────────────────────────
@@ -837,6 +848,7 @@
       settings.sensitiveHostProtection = saved.sensitiveHostProtection !== false;
       settings.sensitiveHostPatterns = typeof saved.sensitiveHostPatterns === "string" ? saved.sensitiveHostPatterns : "";
       settings.sensitiveHostOverrides = this.normalizeHostList(saved.sensitiveHostOverrides);
+      settings.disclosureAckedSources = Array.isArray(saved.disclosureAckedSources) ? saved.disclosureAckedSources.filter(s => SOURCE_ORDER.includes(s)) : [];
       const sourceChanged = SOURCE_ORDER.some(source => saved.sources?.[source] !== settings.sources[source]);
       const hostSettingsChanged = settings.sensitiveHostProtection !== saved.sensitiveHostProtection ||
         settings.sensitiveHostPatterns !== saved.sensitiveHostPatterns ||
@@ -2425,6 +2437,18 @@
 .sf-action-btn.githubgist { background: linear-gradient(135deg, ${THEME.githubgistDim}, ${THEME.githubgist}88); }
 .sf-action-btn.github { background: linear-gradient(135deg, ${THEME.githubDim}, ${THEME.github}88); }
 
+/* Disclosure */
+.sf-disclosure { padding: 30px 24px; text-align: left; }
+.sf-disclosure-title { font: 700 15px/1.3 inherit; color: ${THEME.text}; margin-bottom: 8px; }
+.sf-disclosure-text { color: ${THEME.subtext0}; font: 400 13px/1.5 inherit; margin-bottom: 16px; }
+.sf-disclosure-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+.sf-disclosure-table th { text-align: left; font: 700 11px/1 inherit; color: ${THEME.subtext1}; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 8px; border-bottom: 1px solid ${THEME.glassBorder}; }
+.sf-disclosure-table td { padding: 8px; border-bottom: 1px solid ${THEME.glassBorder}22; vertical-align: middle; }
+.sf-disclosure-source { display: flex; align-items: center; gap: 8px; font: 600 13px/1.3 inherit; color: ${THEME.text}; cursor: pointer; }
+.sf-disclosure-source input { accent-color: ${THEME.green}; width: 16px; height: 16px; cursor: pointer; }
+.sf-disclosure-hosts { font: 400 12px/1.4 inherit; color: ${THEME.subtext0}; font-family: monospace; }
+.sf-disclosure-actions { text-align: center; }
+
 /* Footer */
 .sf-footer {
   padding: 12px 20px; border-top: 1px solid ${THEME.glassBorder};
@@ -3051,6 +3075,10 @@
         this._showHostBlocked(hostBlock);
         return;
       }
+      if (this._needsDisclosure()) {
+        this._showDisclosure();
+        return;
+      }
       this._loadScripts();
     }
 
@@ -3282,6 +3310,62 @@
         console.info("[Script Finder diagnostics]", diagnostic);
         this.toast.show("Diagnostics written to console");
       }
+    }
+
+    // ── Disclosure ──────────────────────────────────────────────────
+    _needsDisclosure() {
+      const acked = this.settings.get("disclosureAckedSources") || [];
+      return this._enabledSourceNames().some(s => !acked.includes(s));
+    }
+
+    _showDisclosure() {
+      this.allScripts = [];
+      this.sourceStatus = null;
+      this._setResultCount(0);
+      this.content.setAttribute("aria-busy", "false");
+      this.modal.querySelector(".sf-modal-title").textContent = "Network disclosure";
+
+      const enabled = this._enabledSourceNames();
+      const rows = enabled.map(source => {
+        const meta = SOURCE_META[source];
+        const hosts = (SOURCE_CONNECT[source] || []).map(h => escapeHtml(h)).join(", ");
+        return `<tr><td><label class="sf-disclosure-source"><input type="checkbox" data-source="${source}" checked /> ${escapeHtml(meta.label)}</label></td><td class="sf-disclosure-hosts">${hosts}</td></tr>`;
+      }).join("");
+
+      _safeHTML(this.content, `
+        <div class="sf-disclosure">
+          <div class="sf-disclosure-title">Source network destinations</div>
+          <div class="sf-disclosure-text">Enabled sources will contact external registries and stores to search for scripts and extensions. Review and disable any sources you prefer not to contact before continuing.</div>
+          <table class="sf-disclosure-table">
+            <thead><tr><th>Source</th><th>Hosts contacted</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="sf-disclosure-actions">
+            <button class="sf-action-btn sf-disclosure-continue" type="button">Continue</button>
+          </div>
+        </div>
+      `);
+
+      this.content.querySelector(".sf-disclosure-continue").addEventListener("click", () => {
+        const checked = [...this.content.querySelectorAll(".sf-disclosure-source input")];
+        const enabledSources = [];
+        checked.forEach(cb => {
+          const source = cb.dataset.source;
+          if (cb.checked) {
+            enabledSources.push(source);
+          } else {
+            const sources = this.settings.get("sources");
+            sources[source] = false;
+            this.settings.set("sources", sources);
+          }
+        });
+        const acked = [...new Set([...(this.settings.get("disclosureAckedSources") || []), ...enabledSources])];
+        this.settings.set("disclosureAckedSources", acked);
+        this._ensureCurrentSource();
+        this._renderTabs();
+        this._updateTabs();
+        this._loadScripts();
+      });
     }
 
     // ── Data ────────────────────────────────────────────────────────

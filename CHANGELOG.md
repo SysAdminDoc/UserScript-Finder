@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.20.0] - 2026-06-30
+
+- Added first-run network disclosure that shows source-to-host mapping before any fetch, lets users disable sources before continuing, and re-triggers when new sources are enabled or settings are reset. Added @connect allowlist audit that validates header/adapter/README consistency.
+
 ## [v1.19.0] - 2026-06-30
 
 - Added runtime manager compatibility checks, degraded-mode reports, Trusted Types duplicate-policy fallback, GM API-safe settings/request/open wrappers, and browser-backed tests for missing GM network/menu capabilities.

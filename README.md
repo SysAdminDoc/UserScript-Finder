@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.19.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.20.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -87,6 +87,7 @@ Click your userscript manager icon on any website and pick a source to search:
 | **Relative Timestamps** | Shows `3d ago`, `2mo ago`, `just now` instead of raw ISO dates |
 | **Inline Settings** | Gear icon opens settings within the modal — no external menus to navigate |
 | **Accessible Modal** | Uses dialog semantics, live result announcements, accessible control names, focus entry/restoration, and contained Tab navigation |
+| **First-Run Network Disclosure** | On first use (or when new sources are enabled), shows which external hosts each source will contact and lets users disable sources before any fetch starts |
 | **Manager Compatibility Checks** | Detects missing GM menu, network, storage, tab, and Trusted Types capabilities at runtime and shows an actionable degraded-mode report instead of failing silently |
 | **Persistent Preferences** | Remembers your last-used source, sort order, dense mode, and cache duration |
 | **Domain-Aware** | Automatically detects the current site and strips `www.`/`m.`/`mobile.` prefixes |

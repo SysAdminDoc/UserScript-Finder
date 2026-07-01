@@ -41,7 +41,8 @@ let browser;
           catalogs: true,
           githubgist: true,
           github: false
-        }
+        },
+        disclosureAckedSources: ["greasyfork", "sleazyfork", "openuserjs", "chromewebstore", "mozillaaddons", "catalogs", "githubgist", "github"]
       }
     };
     let nextMenuId = 0;
