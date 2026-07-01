@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.25.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.26.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -68,7 +68,7 @@ Click your userscript manager icon on any website and pick a source to search:
 
 | Feature | Description |
 |---------|-------------|
-| **Eight Sources** | Search GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, curated catalogs, GitHub Gists, and GitHub from a single interface |
+| **Eight Sources + All** | Search GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, curated catalogs, GitHub Gists, and GitHub from a single interface — or query all enabled sources at once with deduplicated results |
 | **One-Click Install** | Install scripts directly from registries and `.user.js` Gists without leaving the page |
 | **Install Safety** | Validates install origins, `.user.js` metadata, and dangerous `@grant` requests before opening a userscript-manager install handoff; unsafe candidates become View actions with inline warnings |
 | **Stale Script Warning** | Flags userscript, GitHub, and Gist results with a red "Stale" badge when last updated more than 2 years ago |

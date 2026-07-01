@@ -2,6 +2,11 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.26.0] - 2026-07-01
+
+- Added aggregate all-sources comparison mode with an "All" tab that queries all enabled sources in parallel, deduplicates results by URL, and shows per-item source badges with accent colors.
+- Added search mode selector (Auto/Exact host/Root domain/Keyword) for query control with persistent mode selection.
+
 ## [v1.25.0] - 2026-07-01
 
 - Added search mode selector (Auto/Exact host/Root domain/Keyword) for query control with persistent mode selection.
