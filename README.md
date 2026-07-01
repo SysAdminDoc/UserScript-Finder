@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.26.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.27.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -207,3 +207,18 @@ Runs 14 tests covering adapter contracts, install safety, match coverage, host n
 ## Contributing
 
 Issues and PRs welcome. [Open an issue](https://github.com/SysAdminDoc/UserScript-Finder/issues) for bugs or feature requests.
+
+### Adding a Source Adapter
+
+Each source is a class with `searchScriptsByHost(host, settings)` returning an array of normalized script objects. To add a new source:
+
+1. **Create the adapter class** — implement `searchScriptsByHost()`, `getDirectSearchUrl()`, and a cache via `SourceRuntime`
+2. **Register in SOURCE_META** — add label, tab name, menu kind, footer URL, and unit type
+3. **Add SOURCE_CONNECT entry** — list all domains the adapter contacts
+4. **Add @connect header** — one `@connect` line per domain
+5. **Wire into ScriptFinder.services** — instantiate in the constructor
+6. **Add InstallSafety allowlist** — if the source serves installable `.user.js` files
+7. **Add a test fixture** — sample response in `tests/fixtures/` with an adapter contract test
+8. **Add accent colors** — source-specific accent in THEME and CSS
+
+The `@connect` allowlist audit (`npm test`) will catch missing @connect entries, orphan domains, and undocumented sources.

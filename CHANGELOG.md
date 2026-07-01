@@ -2,6 +2,12 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.27.0] - 2026-07-01
+
+- Added UI string catalog centralizing modal titles, toasts, empty states, disclosure text, and button labels for localization readiness.
+- Added live fixture refresh script that fetches redacted samples from GreasyFork, Mozilla AMO, and GitHub APIs into tests/fixtures/live/.
+- Added source-adapter documentation in README Contributing section.
+
 ## [v1.26.0] - 2026-07-01
 
 - Added aggregate all-sources comparison mode with an "All" tab that queries all enabled sources in parallel, deduplicates results by URL, and shows per-item source badges with accent colors.
