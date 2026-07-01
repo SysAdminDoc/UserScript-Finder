@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.20.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.21.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -72,7 +72,8 @@ Click your userscript manager icon on any website and pick a source to search:
 | **One-Click Install** | Install scripts directly from registries and `.user.js` Gists without leaving the page |
 | **Install Safety** | Validates install origins and `.user.js` metadata before opening a userscript-manager install handoff; unsafe candidates become View actions with an inline warning |
 | **Live Search Filter** | Real-time filtering within results with match count (e.g., `12/47`) |
-| **Result Filters** | Narrow results by recent update window, normalized minimum rating, and English-looking names/descriptions |
+| **Result Filters** | Narrow results by recent update window, normalized minimum rating, and language (Any, Browser, or English) |
+| **Fielded Search** | Search with `author:`, `license:`, `source:`, `name:`, or `url:` prefixes that combine with plain text and filter controls |
 | **Source Resilience** | Adds per-source timeouts, rate-limit/backoff classification, stale-cache fallback, degraded-result notices, retry controls, and manual-search escape hatches |
 | **Source Health Diagnostics** | Shows per-source OK/cache/stale/partial/rate-limit/failure badges, footer health age, and copyable diagnostics limited to source, host, status, timestamps, cache age, and count |
 | **Source Privacy Controls** | Lets users disable individual sources so those sources disappear from menus/tabs and make no network requests until re-enabled |
@@ -89,6 +90,7 @@ Click your userscript manager icon on any website and pick a source to search:
 | **Accessible Modal** | Uses dialog semantics, live result announcements, accessible control names, focus entry/restoration, and contained Tab navigation |
 | **First-Run Network Disclosure** | On first use (or when new sources are enabled), shows which external hosts each source will contact and lets users disable sources before any fetch starts |
 | **Manager Compatibility Checks** | Detects missing GM menu, network, storage, tab, and Trusted Types capabilities at runtime and shows an actionable degraded-mode report instead of failing silently |
+| **Cross-Tab Settings Sync** | Settings changes propagate to other open tabs via `GM_addValueChangeListener` with polling fallback |
 | **Persistent Preferences** | Remembers your last-used source, sort order, dense mode, and cache duration |
 | **Domain-Aware** | Automatically detects the current site and strips `www.`/`m.`/`mobile.` prefixes |
 | **Public-Suffix Aware Matching** | Normalizes common multi-label and hosted suffixes such as `co.uk`, `com.au`, `github.io`, `pages.dev`, and `netlify.app` before root-domain fallback |

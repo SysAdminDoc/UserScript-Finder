@@ -2,6 +2,15 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.21.0] - 2026-07-01
+
+- Added diagnostics manual-copy fallback with a selectable textarea, retry-copy button, and close control when clipboard API is denied.
+- Added cross-tab settings sync via GM_addValueChangeListener with a 3-second polling fallback for managers that lack the API.
+- Added chunked result rendering (batches of 30 via requestAnimationFrame) to prevent modal jank on large result sets.
+- Replaced the English-only toggle with a locale-aware language filter dropdown (Any / Browser language / English) that respects explicit script locale metadata before falling back to the Latin-ratio heuristic.
+- Added fielded result filtering with `author:`, `license:`, `source:`, `name:`, and `url:` prefix support in the search box.
+- Added release metadata consistency checks (CHANGELOG entry, package.json version) to the @connect allowlist audit.
+
 ## [v1.20.0] - 2026-06-30
 
 - Added first-run network disclosure that shows source-to-host mapping before any fetch, lets users disable sources before continuing, and re-triggers when new sources are enabled or settings are reset. Added @connect allowlist audit that validates header/adapter/README consistency.
