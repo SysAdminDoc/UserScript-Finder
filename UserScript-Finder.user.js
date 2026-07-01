@@ -2430,6 +2430,10 @@
 .sf-badge.score-mid { background: ${THEME.yellow}18; color: ${THEME.yellow}; border-color: ${THEME.yellow}33; }
 .sf-badge.score-low { background: ${THEME.red}18; color: ${THEME.red}; border-color: ${THEME.red}33; }
 .sf-badge.stale-flag { background: ${THEME.red}18; color: ${THEME.red}; border-color: ${THEME.red}33; }
+.sf-dismiss-btn { background: none; border: none; color: ${THEME.overlay}; cursor: pointer; padding: 4px; border-radius: 6px; transition: color 0.15s, background 0.15s; flex-shrink: 0; }
+.sf-dismiss-btn:hover { color: ${THEME.red}; background: ${THEME.red}18; }
+.sf-dismissed-notice { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; color: ${THEME.subtext0}; font: 500 12px/1 inherit; border-top: 1px solid ${THEME.glassBorder}22; }
+.sf-restore-dismissed { background: none; border: none; color: ${THEME.green}; font: 600 12px/1 inherit; cursor: pointer; text-decoration: underline; }
 .sf-badge.coverage-exact { background: ${THEME.green}18; color: ${THEME.green}; border-color: ${THEME.green}33; }
 .sf-badge.coverage-broad { background: ${THEME.yellow}18; color: ${THEME.yellow}; border-color: ${THEME.yellow}33; }
 .sf-badge.coverage-uncertain { background: ${THEME.surface2}; color: ${THEME.subtext1}; border-color: ${THEME.glassBorder}; }
@@ -3660,6 +3664,10 @@
         });
       }
       scripts = this._applyFilters(scripts);
+      const dismissed = this._getDismissed();
+      if (dismissed.length) {
+        scripts = scripts.filter(s => !dismissed.includes(this._scriptKey(s)));
+      }
       const constrained = this.searchQuery || this._hasActiveFilters();
       this.searchCount.textContent = constrained ? `${scripts.length}/${this.allScripts.length}` : "";
 
@@ -3704,9 +3712,52 @@
           this._chunkTimer = requestAnimationFrame(renderBatch);
         } else {
           this._chunkTimer = null;
+          this._updateDismissedCount();
         }
       };
       renderBatch();
+    }
+
+    _scriptKey(script) {
+      return `${script._source || ""}:${script._full_name || script.url || script.name || ""}`;
+    }
+
+    _getDismissed() {
+      const domain = HostService.extractRootDomain(this.currentDomain || HostService.getCurrentHost());
+      const all = gmGetValue("sf_dismissed", {}) || {};
+      return all[domain] || [];
+    }
+
+    _dismissScript(script) {
+      const domain = HostService.extractRootDomain(this.currentDomain || HostService.getCurrentHost());
+      const all = gmGetValue("sf_dismissed", {}) || {};
+      const list = all[domain] || [];
+      const key = this._scriptKey(script);
+      if (!list.includes(key)) list.push(key);
+      all[domain] = list;
+      gmSetValue("sf_dismissed", all);
+    }
+
+    _updateDismissedCount() {
+      const dismissed = this._getDismissed();
+      if (dismissed.length) {
+        const existing = this.content.querySelector(".sf-dismissed-notice");
+        if (existing) {
+          existing.querySelector(".sf-dismissed-count").textContent = dismissed.length;
+        } else {
+          const notice = document.createElement("div");
+          notice.className = "sf-dismissed-notice";
+          _safeHTML(notice, `<span><span class="sf-dismissed-count">${dismissed.length}</span> hidden</span> <button class="sf-restore-dismissed" type="button">Show all</button>`);
+          notice.querySelector(".sf-restore-dismissed").addEventListener("click", () => {
+            const domain = HostService.extractRootDomain(this.currentDomain || HostService.getCurrentHost());
+            const all = gmGetValue("sf_dismissed", {}) || {};
+            delete all[domain];
+            gmSetValue("sf_dismissed", all);
+            this._displayScripts();
+          });
+          this.content.appendChild(notice);
+        }
+      }
     }
 
     _parseFieldedQuery(raw) {
@@ -3969,7 +4020,8 @@
         actionBtn = "";
       }
       const previewBtn = safeInstallUrl ? `<button class="sf-preview-btn" data-url="${escapeHtml(safeInstallUrl)}" title="Preview match coverage">${getIcon('search')} Coverage</button>` : "";
-      const actionsHtml = actionBtn || previewBtn ? `<div class="sf-script-actions">${actionBtn}${previewBtn}</div>` : "";
+      const dismissBtn = `<button class="sf-dismiss-btn" title="Hide this result" aria-label="Dismiss ${escapeHtml(script.name || 'script')}">${getIcon('x')}</button>`;
+      const actionsHtml = `<div class="sf-script-actions">${actionBtn}${previewBtn}${dismissBtn}</div>`;
 
       _safeHTML(item, `
         <div class="sf-script-top">
@@ -4009,9 +4061,21 @@
         });
       }
 
+      // Dismiss handler
+      const dismissEl = item.querySelector(".sf-dismiss-btn");
+      if (dismissEl) {
+        dismissEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this._dismissScript(script);
+          item.style.opacity = "0";
+          item.style.transition = "opacity 0.2s ease";
+          setTimeout(() => { item.remove(); this._updateDismissedCount(); }, 200);
+        });
+      }
+
       // Click-to-open script page
       item.addEventListener("click", (e) => {
-        if (e.target.closest("a") || e.target.closest(".sf-install-btn")) return;
+        if (e.target.closest("a") || e.target.closest(".sf-install-btn") || e.target.closest(".sf-dismiss-btn")) return;
         this._openUrl(scriptUrl);
       });
 
