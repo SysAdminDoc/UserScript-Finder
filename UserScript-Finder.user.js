@@ -157,6 +157,49 @@
     disclosureAckedSources: []
   };
 
+  const STRINGS = {
+    modalTitleScripts: (host) => `Scripts for ${host}`,
+    modalTitleExtensions: (host) => `Extensions for ${host}`,
+    modalTitleCatalogs: (host) => `Catalogs for ${host}`,
+    modalTitleGists: (host) => `Gists for ${host}`,
+    modalTitleResults: (host) => `Results for ${host}`,
+    modalTitleCompat: "Manager compatibility",
+    modalTitleDisclosure: "Network disclosure",
+    emptyNoScripts: (host, label) => `Nothing matched ${host} on ${label}.`,
+    emptyNoMatches: "No matches",
+    emptyNoMatchFilter: (query) => `No scripts match "${query}"`,
+    emptyNoMatchFilters: "No scripts match the active filters.",
+    emptySourceDisabled: "Source disabled",
+    emptySourceDisabledText: "Enable this source in settings to search it.",
+    emptyHostBlocked: "Search disabled on sensitive host",
+    loadingSearch: (label) => `Searching ${label}...`,
+    loadingAllSources: "Searching all sources...",
+    toastDiagCopied: "Diagnostics copied",
+    toastDiagConsole: "Copy failed — select and copy manually",
+    toastDiagManual: "Copy diagnostics manually",
+    toastSettingsExported: "Settings exported",
+    toastSettingsImported: "Settings imported",
+    toastImportFailed: "Import failed: invalid JSON",
+    toastInstallBlocked: (reason) => `Install blocked: ${reason}`,
+    toastInstallMetaMissing: "Install blocked: .user.js metadata block missing.",
+    toastGrantWarning: (grants) => `Warning: requests ${grants}`,
+    toastQueued: "Queued to try later",
+    toastUnqueued: "Removed from queue",
+    btnSearchManually: "Search manually",
+    btnTryAgain: "Try again",
+    btnContinue: "Continue",
+    btnShowAll: "Show all",
+    btnRetryCopy: "Retry copy",
+    btnExport: "Export settings",
+    btnImport: "Import settings",
+    labelDismissedCount: (n) => `${n} hidden`,
+    disclosureTitle: "Source network destinations",
+    disclosureText: "Enabled sources will contact external registries and stores to search for scripts and extensions. Review and disable any sources you prefer not to contact before continuing.",
+    compatTitle: "Userscript manager degraded mode",
+    filterPlaceholder: "Filter... (author: license: source: name: url:)",
+    staleWarning: "Last updated more than 2 years ago"
+  };
+
   // ── Catppuccin Mocha + OLED palette ─────────────────────────────────
   const THEME = {
     base:     '#0a0a0f',
@@ -3126,7 +3169,7 @@
         a.download = "userscript-finder-settings.json";
         a.click();
         URL.revokeObjectURL(url);
-        this.toast.show("Settings exported");
+        this.toast.show(STRINGS.toastSettingsExported);
       });
 
       const importFile = this.modal.querySelector(".sf-import-file");
@@ -3145,8 +3188,8 @@
             this._syncSettingsUi();
             this._renderTabs();
             this._updateTabs();
-            this.toast.show("Settings imported");
-          } catch { this.toast.show("Import failed: invalid JSON"); }
+            this.toast.show(STRINGS.toastSettingsImported);
+          } catch { this.toast.show(STRINGS.toastImportFailed); }
         };
         reader.readAsText(file);
         e.target.value = "";
@@ -3389,7 +3432,7 @@
       this.sourceStatus = null;
       this._setResultCount(0);
       this.content.setAttribute("aria-busy", "false");
-      this.modal.querySelector(".sf-modal-title").textContent = "Manager compatibility";
+      this.modal.querySelector(".sf-modal-title").textContent = STRINGS.modalTitleCompat;
       _safeHTML(this.content, `
         <div class="sf-error sf-compat-report">
           <div class="sf-error-title">Userscript manager degraded mode</div>
@@ -3486,7 +3529,7 @@
       try {
         if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
         await navigator.clipboard.writeText(diagnostic);
-        this.toast.show("Diagnostics copied");
+        this.toast.show(STRINGS.toastDiagCopied);
       } catch(err) {
         console.info("[Script Finder diagnostics]", diagnostic);
         this._showDiagnosticsFallback(diagnostic);
@@ -3518,9 +3561,9 @@
         try {
           if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
           await navigator.clipboard.writeText(text);
-          this.toast.show("Diagnostics copied");
+          this.toast.show(STRINGS.toastDiagCopied);
           panel.remove();
-        } catch { this.toast.show("Copy failed — select and copy manually"); }
+        } catch { this.toast.show(STRINGS.toastDiagConsole); }
       });
     }
 
@@ -3535,7 +3578,7 @@
       this.sourceStatus = null;
       this._setResultCount(0);
       this.content.setAttribute("aria-busy", "false");
-      this.modal.querySelector(".sf-modal-title").textContent = "Network disclosure";
+      this.modal.querySelector(".sf-modal-title").textContent = STRINGS.modalTitleDisclosure;
 
       const enabled = this._enabledSourceNames();
       const rows = enabled.map(source => {
@@ -3546,8 +3589,8 @@
 
       _safeHTML(this.content, `
         <div class="sf-disclosure">
-          <div class="sf-disclosure-title">Source network destinations</div>
-          <div class="sf-disclosure-text">Enabled sources will contact external registries and stores to search for scripts and extensions. Review and disable any sources you prefer not to contact before continuing.</div>
+          <div class="sf-disclosure-title">${STRINGS.disclosureTitle}</div>
+          <div class="sf-disclosure-text">${STRINGS.disclosureText}</div>
           <table class="sf-disclosure-table">
             <thead><tr><th>Source</th><th>Hosts contacted</th></tr></thead>
             <tbody>${rows}</tbody>
@@ -3584,7 +3627,7 @@
       if (this.isLoading) return;
       this.isLoading = true;
       this.content.setAttribute("aria-busy", "true");
-      _safeHTML(this.content, `<div class="sf-loading"><div class="sf-spinner"></div><div class="sf-loading-text">Searching all sources...</div></div>`);
+      _safeHTML(this.content, `<div class="sf-loading"><div class="sf-spinner"></div><div class="sf-loading-text">${STRINGS.loadingAllSources}</div></div>`);
 
       const host = HostService.getCurrentHost();
       this.currentDomain = host;
@@ -3658,7 +3701,7 @@
         this.allScripts = [];
         this.sourceStatus = null;
         this._setResultCount(0);
-        _safeHTML(this.content, `<div class="sf-empty"><div class="sf-empty-title">Source disabled</div><div class="sf-empty-text">Enable this source in settings to search it.</div></div>`);
+        _safeHTML(this.content, `<div class="sf-empty"><div class="sf-empty-title">${STRINGS.emptySourceDisabled}</div><div class="sf-empty-text">${STRINGS.emptySourceDisabledText}</div></div>`);
         return;
       }
       this.isLoading = true;
@@ -3743,8 +3786,8 @@
       const noticeHtml = this._sourceNoticeHtml();
 
       // Update title
-      const titleType = this.currentService === "_all" ? "Results" : this.currentService === "catalogs" ? "Catalogs" : this.currentService === "githubgist" ? "Gists" : ["chromewebstore", "mozillaaddons"].includes(this.currentService) ? "Extensions" : "Scripts";
-      this.modal.querySelector(".sf-modal-title").textContent = `${titleType} for ${displayHost}`;
+      const titleFn = this.currentService === "_all" ? STRINGS.modalTitleResults : this.currentService === "catalogs" ? STRINGS.modalTitleCatalogs : this.currentService === "githubgist" ? STRINGS.modalTitleGists : ["chromewebstore", "mozillaaddons"].includes(this.currentService) ? STRINGS.modalTitleExtensions : STRINGS.modalTitleScripts;
+      this.modal.querySelector(".sf-modal-title").textContent = titleFn(displayHost);
 
       if (this.searchQuery) {
         const { fields, text } = this._parseFieldedQuery(this.searchQuery);
@@ -4035,7 +4078,7 @@
       try {
         const source = await this._fetchPreviewSource(validation.url, script);
         if (!InstallSafety.hasUserScriptMetadata(source)) {
-          this.toast.show("Install blocked: .user.js metadata block missing.");
+          this.toast.show(STRINGS.toastInstallMetaMissing);
           return;
         }
         const dangerousGrants = InstallSafety.dangerousGrants(source);
@@ -4206,7 +4249,7 @@
           queueEl.classList.toggle("queued", isQueued);
           queueEl.setAttribute("aria-pressed", String(isQueued));
           queueEl.title = isQueued ? "Remove from queue" : "Queue to try later";
-          this.toast.show(isQueued ? "Queued to try later" : "Removed from queue");
+          this.toast.show(isQueued ? STRINGS.toastQueued : STRINGS.toastUnqueued);
         });
       }
 
