@@ -286,9 +286,20 @@
     return null;
   }
 
-  function looksEnglish(script) {
+  function matchesLanguageFilter(script, filterValue) {
+    if (filterValue === "any") return true;
     const locale = String(script?.locale || script?._locale || "").toLowerCase();
+    if (filterValue === "browser") {
+      const browserLang = (navigator.language || "en").split("-")[0].toLowerCase();
+      if (locale) return locale.startsWith(browserLang);
+      if (browserLang === "en") return _looksLatin(script);
+      return true;
+    }
     if (locale) return locale.startsWith("en");
+    return _looksLatin(script);
+  }
+
+  function _looksLatin(script) {
     const text = `${script?.name || ""} ${script?.description || ""}`;
     if (!text.trim()) return true;
     const latin = (text.match(/[A-Za-z]/g) || []).length;
@@ -1993,7 +2004,7 @@
       GitHubGistService,
       reputationScore,
       normalizedRating,
-      looksEnglish,
+      matchesLanguageFilter,
       extensionTrustBadges,
       normalizeStringList,
       hasBroadHostAccess
@@ -2603,7 +2614,7 @@
       };
       this.currentService = this._firstEnabledSource(this.settings.get("lastService") || "greasyfork");
       this.currentSort = this.settings.get("defaultSort");
-      this.filters = { updatedMonths: "any", minRating: "any", englishOnly: false };
+      this.filters = { updatedMonths: "any", minRating: "any", languageFilter: "any" };
       this.currentDomain = HostService.getCurrentHost();
       this.isOpen = false;
       this.isLoading = false;
@@ -2895,7 +2906,11 @@
             <option value="4">4+ rating</option>
             <option value="4.5">4.5+ rating</option>
           </select>
-          <button class="sf-filter-toggle" data-filter="englishOnly" title="English-looking names and descriptions" aria-label="Toggle English-looking filter" aria-pressed="false">English</button>
+          <select class="sf-filter-select sf-lang-filter" data-filter="languageFilter" aria-label="Language filter">
+            <option value="any">Any language</option>
+            <option value="browser">Browser language</option>
+            <option value="en">English</option>
+          </select>
         </div>
         <div class="sf-content" aria-live="polite" aria-busy="false">
           <div class="sf-loading">
@@ -2987,10 +3002,8 @@
         });
       });
 
-      this.modal.querySelector(".sf-filter-toggle").addEventListener("click", e => {
-        this.filters.englishOnly = !this.filters.englishOnly;
-        e.currentTarget.classList.toggle("active", this.filters.englishOnly);
-        e.currentTarget.setAttribute("aria-pressed", String(this.filters.englishOnly));
+      this.modal.querySelector(".sf-lang-filter")?.addEventListener("change", e => {
+        this.filters.languageFilter = e.target.value;
         this._displayScripts();
       });
 
@@ -3636,7 +3649,7 @@
     }
 
     _hasActiveFilters() {
-      return this.filters.updatedMonths !== "any" || this.filters.minRating !== "any" || this.filters.englishOnly;
+      return this.filters.updatedMonths !== "any" || this.filters.minRating !== "any" || this.filters.languageFilter !== "any";
     }
 
     _applyFilters(scripts) {
@@ -3654,7 +3667,7 @@
           const rating = normalizedRating(script);
           if (rating == null || rating < ratingFloor) return false;
         }
-        if (this.filters.englishOnly && !looksEnglish(script)) return false;
+        if (this.filters.languageFilter !== "any" && !matchesLanguageFilter(script, this.filters.languageFilter)) return false;
         return true;
       });
     }

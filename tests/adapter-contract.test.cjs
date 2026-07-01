@@ -76,8 +76,8 @@ function assertShape(item, source) {
 
     const helperChecks = {
       normalizedRating: hooks.normalizedRating({ fan_score: 8 }),
-      english: hooks.looksEnglish({ name: "Reddit Helper", description: "English text" }),
-      nonEnglish: hooks.looksEnglish({ name: "帮助", description: "脚本" }),
+      english: hooks.matchesLanguageFilter({ name: "Reddit Helper", description: "English text" }, "en"),
+      nonEnglish: hooks.matchesLanguageFilter({ name: "帮助", description: "脚本" }, "en"),
       reputationOrder: hooks.reputationScore({ total_installs: 1000, good_ratings: 5 }) >
         hooks.reputationScore({ total_installs: 1, good_ratings: 0 }),
       broadHostAccess: hooks.hasBroadHostAccess(["<all_urls>"]),
