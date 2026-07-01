@@ -2449,6 +2449,15 @@
 .sf-disclosure-hosts { font: 400 12px/1.4 inherit; color: ${THEME.subtext0}; font-family: monospace; }
 .sf-disclosure-actions { text-align: center; }
 
+/* Diagnostics fallback */
+.sf-diagnostics-fallback { padding: 12px 20px; border-top: 1px solid ${THEME.glassBorder}; background: ${THEME.surface0}88; }
+.sf-diagnostics-fallback-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font: 600 12px/1 inherit; color: ${THEME.subtext1}; }
+.sf-diagnostics-fallback-close { background: none; border: none; color: ${THEME.subtext0}; cursor: pointer; padding: 4px; }
+.sf-diagnostics-textarea { width: 100%; height: 100px; resize: vertical; background: ${THEME.base}; color: ${THEME.text}; border: 1px solid ${THEME.glassBorder}; border-radius: 8px; padding: 8px; font: 400 11px/1.4 monospace; box-sizing: border-box; }
+.sf-diagnostics-fallback-actions { margin-top: 8px; text-align: right; }
+.sf-diagnostics-retry-btn { background: ${THEME.surface1}; color: ${THEME.text}; border: 1px solid ${THEME.glassBorder}; border-radius: 8px; padding: 6px 14px; font: 600 12px/1 inherit; cursor: pointer; }
+.sf-diagnostics-retry-btn:hover { background: ${THEME.surface2}; }
+
 /* Footer */
 .sf-footer {
   padding: 12px 20px; border-top: 1px solid ${THEME.glassBorder};
@@ -3308,8 +3317,39 @@
         this.toast.show("Diagnostics copied");
       } catch(err) {
         console.info("[Script Finder diagnostics]", diagnostic);
-        this.toast.show("Diagnostics written to console");
+        this._showDiagnosticsFallback(diagnostic);
       }
+    }
+
+    _showDiagnosticsFallback(text) {
+      const existing = this.modal.querySelector(".sf-diagnostics-fallback");
+      if (existing) { existing.remove(); return; }
+      const panel = document.createElement("div");
+      panel.className = "sf-diagnostics-fallback";
+      _safeHTML(panel, `
+        <div class="sf-diagnostics-fallback-header">
+          <span>Copy diagnostics manually</span>
+          <button class="sf-diagnostics-fallback-close" aria-label="Close diagnostics" type="button">${getIcon('x')}</button>
+        </div>
+        <textarea class="sf-diagnostics-textarea" readonly spellcheck="false" aria-label="Diagnostics output">${escapeHtml(text)}</textarea>
+        <div class="sf-diagnostics-fallback-actions">
+          <button class="sf-diagnostics-retry-btn" type="button">Retry copy</button>
+        </div>
+      `);
+      const footer = this.modal.querySelector(".sf-footer");
+      footer.parentNode.insertBefore(panel, footer);
+      const textarea = panel.querySelector(".sf-diagnostics-textarea");
+      textarea.focus();
+      textarea.select();
+      panel.querySelector(".sf-diagnostics-fallback-close").addEventListener("click", () => panel.remove());
+      panel.querySelector(".sf-diagnostics-retry-btn").addEventListener("click", async () => {
+        try {
+          if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+          await navigator.clipboard.writeText(text);
+          this.toast.show("Diagnostics copied");
+          panel.remove();
+        } catch { this.toast.show("Copy failed — select and copy manually"); }
+      });
     }
 
     // ── Disclosure ──────────────────────────────────────────────────
