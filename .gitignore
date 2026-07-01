@@ -3,6 +3,7 @@ dist/
 *.bak
 .env
 *.log
+tests/fixtures/live/
 CLAUDE.md
 
 # Markdown files local-only (except README)
