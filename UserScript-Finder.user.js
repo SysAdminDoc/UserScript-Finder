@@ -2568,6 +2568,7 @@
   font: 800 10px/1 inherit; cursor: pointer;
 }
 .sf-setting-mini-btn:hover { color: ${THEME.text}; background: ${THEME.surface2}; }
+.sf-settings-export-row { gap: 8px; }
 .sf-toggle {
   position: relative; width: 36px; height: 20px; border-radius: 10px;
   background: ${THEME.surface2}; cursor: pointer; transition: background 0.2s ease;
@@ -2950,6 +2951,12 @@
           ${this._privacySettingsHtml()}
           <div class="sf-settings-subtitle">Sources</div>
           ${this._sourceSettingsHtml()}
+          <div class="sf-settings-subtitle">Data</div>
+          <div class="sf-setting-row sf-settings-export-row">
+            <button class="sf-setting-mini-btn sf-export-btn" type="button">Export settings</button>
+            <button class="sf-setting-mini-btn sf-import-btn" type="button">Import settings</button>
+            <input type="file" class="sf-import-file" accept=".json" style="display:none" />
+          </div>
         </div>
         <div class="sf-footer">
           <div class="sf-footer-text">Data from <a href="https://greasyfork.org" target="_blank">GreasyFork</a><span class="sf-health-pill">Not checked</span></div>
@@ -3053,6 +3060,42 @@
           this.settings.set(key, val);
           if (key === "defaultSort") { this.currentSort = val; this.sortSelect.value = val; this._displayScripts(); }
         });
+      });
+
+      // Export/Import settings
+      this.modal.querySelector(".sf-export-btn")?.addEventListener("click", () => {
+        const data = JSON.stringify(this.settings.settings, null, 2);
+        const blob = new Blob([data], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "userscript-finder-settings.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        this.toast.show("Settings exported");
+      });
+
+      const importFile = this.modal.querySelector(".sf-import-file");
+      this.modal.querySelector(".sf-import-btn")?.addEventListener("click", () => importFile?.click());
+      importFile?.addEventListener("change", e => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const imported = JSON.parse(reader.result);
+            if (typeof imported !== "object" || imported === null) throw new Error("Invalid settings");
+            Object.entries(imported).forEach(([key, value]) => this.settings.set(key, value));
+            this._ensureCurrentSource();
+            this._setupMenuCommands();
+            this._syncSettingsUi();
+            this._renderTabs();
+            this._updateTabs();
+            this.toast.show("Settings imported");
+          } catch { this.toast.show("Import failed: invalid JSON"); }
+        };
+        reader.readAsText(file);
+        e.target.value = "";
       });
 
       // Outside click / Escape
