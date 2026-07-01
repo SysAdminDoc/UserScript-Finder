@@ -3612,12 +3612,27 @@
       const sorted = this._sortScripts(scripts);
       this._setResultCount(this.allScripts.length);
 
-      // Build items
       _safeHTML(this.content, noticeHtml);
-      sorted.forEach((script, i) => {
-        const item = this._createScriptItem(script, svcClass, i);
-        this.content.appendChild(item);
-      });
+      this._renderChunked(sorted, svcClass);
+    }
+
+    _renderChunked(items, svcClass) {
+      if (this._chunkTimer) { cancelAnimationFrame(this._chunkTimer); this._chunkTimer = null; }
+      const CHUNK = 30;
+      let offset = 0;
+      const renderBatch = () => {
+        const end = Math.min(offset + CHUNK, items.length);
+        for (let i = offset; i < end; i++) {
+          this.content.appendChild(this._createScriptItem(items[i], svcClass, i));
+        }
+        offset = end;
+        if (offset < items.length) {
+          this._chunkTimer = requestAnimationFrame(renderBatch);
+        } else {
+          this._chunkTimer = null;
+        }
+      };
+      renderBatch();
     }
 
     _hasActiveFilters() {
