@@ -2872,7 +2872,7 @@
         <div class="sf-search-wrap">
           <div class="sf-search-box">
             ${getIcon('search')}
-            <input class="sf-search-input" type="text" placeholder="Filter scripts..." spellcheck="false" aria-label="Filter results" />
+            <input class="sf-search-input" type="text" placeholder="Filter... (author: license: source: name: url:)" spellcheck="false" aria-label="Filter results" />
             <span class="sf-search-count"></span>
           </div>
         </div>
@@ -3586,17 +3586,24 @@
       const titleType = this.currentService === "catalogs" ? "Catalogs" : this.currentService === "githubgist" ? "Gists" : ["chromewebstore", "mozillaaddons"].includes(this.currentService) ? "Extensions" : "Scripts";
       this.modal.querySelector(".sf-modal-title").textContent = `${titleType} for ${displayHost}`;
 
-      // Filter by search
       if (this.searchQuery) {
-        scripts = scripts.filter(s =>
-          (s.name || "").toLowerCase().includes(this.searchQuery) ||
-          (s.description || "").toLowerCase().includes(this.searchQuery) ||
-          (s.users?.[0]?.name || "").toLowerCase().includes(this.searchQuery) ||
-          (s._full_name || "").toLowerCase().includes(this.searchQuery) ||
-          (s._catalog_source || "").toLowerCase().includes(this.searchQuery) ||
-          (s._category || "").toLowerCase().includes(this.searchQuery) ||
-          (s._topics || []).some(t => t.toLowerCase().includes(this.searchQuery))
-        );
+        const { fields, text } = this._parseFieldedQuery(this.searchQuery);
+        scripts = scripts.filter(s => {
+          for (const { key, value } of fields) {
+            const target = this._fieldValue(s, key);
+            if (!target.includes(value)) return false;
+          }
+          if (text) {
+            return (s.name || "").toLowerCase().includes(text) ||
+              (s.description || "").toLowerCase().includes(text) ||
+              (s.users?.[0]?.name || "").toLowerCase().includes(text) ||
+              (s._full_name || "").toLowerCase().includes(text) ||
+              (s._catalog_source || "").toLowerCase().includes(text) ||
+              (s._category || "").toLowerCase().includes(text) ||
+              (s._topics || []).some(t => t.toLowerCase().includes(text));
+          }
+          return true;
+        });
       }
       scripts = this._applyFilters(scripts);
       const constrained = this.searchQuery || this._hasActiveFilters();
@@ -3646,6 +3653,31 @@
         }
       };
       renderBatch();
+    }
+
+    _parseFieldedQuery(raw) {
+      const fields = [];
+      const textParts = [];
+      for (const token of raw.split(/\s+/)) {
+        const match = token.match(/^(author|license|source|name|url):(.+)$/i);
+        if (match) {
+          fields.push({ key: match[1].toLowerCase(), value: match[2].toLowerCase() });
+        } else {
+          textParts.push(token);
+        }
+      }
+      return { fields, text: textParts.join(" ").trim() };
+    }
+
+    _fieldValue(script, key) {
+      switch (key) {
+        case "author": return (script.users?.[0]?.name || script.users?.[0]?.url || "").toLowerCase();
+        case "license": return (script.license || "").toLowerCase();
+        case "source": return (script._source || "").toLowerCase();
+        case "name": return (script.name || "").toLowerCase();
+        case "url": return (script.url || script.code_url || "").toLowerCase();
+        default: return "";
+      }
     }
 
     _hasActiveFilters() {
