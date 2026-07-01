@@ -5,7 +5,7 @@
 <h1 align="center">UserScript Finder</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.21.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.22.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
   <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
@@ -70,7 +70,8 @@ Click your userscript manager icon on any website and pick a source to search:
 |---------|-------------|
 | **Eight Sources** | Search GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, curated catalogs, GitHub Gists, and GitHub from a single interface |
 | **One-Click Install** | Install scripts directly from registries and `.user.js` Gists without leaving the page |
-| **Install Safety** | Validates install origins and `.user.js` metadata before opening a userscript-manager install handoff; unsafe candidates become View actions with an inline warning |
+| **Install Safety** | Validates install origins, `.user.js` metadata, and dangerous `@grant` requests before opening a userscript-manager install handoff; unsafe candidates become View actions with inline warnings |
+| **Stale Script Warning** | Flags userscript, GitHub, and Gist results with a red "Stale" badge when last updated more than 2 years ago |
 | **Live Search Filter** | Real-time filtering within results with match count (e.g., `12/47`) |
 | **Result Filters** | Narrow results by recent update window, normalized minimum rating, and language (Any, Browser, or English) |
 | **Fielded Search** | Search with `author:`, `license:`, `source:`, `name:`, or `url:` prefixes that combine with plain text and filter controls |
@@ -123,6 +124,7 @@ Access via the ⚙ gear icon in the modal header:
 | Cache Duration | 1, 5, 10, 30 minutes | 5 minutes |
 | Sources | Per-source On / Off toggles | All sources on |
 | Sensitive Host Protection | On / Off plus extra blocked host patterns and per-host override | On |
+| Export / Import | Download settings as JSON or import from a file | — |
 
 ## Theme
 

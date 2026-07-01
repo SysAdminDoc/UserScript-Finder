@@ -2,6 +2,12 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.22.0] - 2026-07-01
+
+- Added red "Stale" badge for userscript, GitHub, and Gist results not updated in 2+ years.
+- Added settings export/import as JSON for cross-machine settings transfer.
+- Added dangerous @grant warning during install handoff — toasts a warning when scripts request GM_xmlhttpRequest, unsafeWindow, window.close, or window.focus.
+
 ## [v1.21.0] - 2026-07-01
 
 - Added diagnostics manual-copy fallback with a selectable textarea, retry-copy button, and close control when clipboard API is denied.
