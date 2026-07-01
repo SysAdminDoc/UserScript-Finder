@@ -2,6 +2,11 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.25.0] - 2026-07-01
+
+- Added search mode selector (Auto/Exact host/Root domain/Keyword) for query control with persistent mode selection.
+- Added rendered modal smoke tests at desktop (1280x800) and mobile (375x667) widths verifying no overflow, clipping, or missing controls.
+
 ## [v1.24.0] - 2026-07-01
 
 - Added cross-domain "Queue to try" list with a calendar button on each result that toggles scripts into a persistent queue stored via GM_setValue.
