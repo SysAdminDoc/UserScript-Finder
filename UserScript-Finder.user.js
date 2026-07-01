@@ -2441,6 +2441,14 @@
 .sf-queue-btn.queued { color: ${THEME.yellow}; }
 .sf-dismiss-btn { background: none; border: none; color: ${THEME.overlay}; cursor: pointer; padding: 4px; border-radius: 6px; transition: color 0.15s, background 0.15s; flex-shrink: 0; }
 .sf-dismiss-btn:hover { color: ${THEME.red}; background: ${THEME.red}18; }
+.sf-source-badge { font: 600 10px/1 inherit; padding: 2px 6px; border-radius: 4px; background: ${THEME.surface1}; color: ${THEME.subtext0}; }
+.sf-source-badge.sleazyfork { color: ${THEME.purple}; }
+.sf-source-badge.openuserjs { color: ${THEME.openuserjs}; }
+.sf-source-badge.chromewebstore { color: ${THEME.chromewebstore}; }
+.sf-source-badge.mozillaaddons { color: ${THEME.mozillaaddons}; }
+.sf-source-badge.catalogs { color: ${THEME.catalogs}; }
+.sf-source-badge.githubgist { color: ${THEME.githubgist}; }
+.sf-source-badge.github { color: ${THEME.github}; }
 .sf-dismissed-notice { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; color: ${THEME.subtext0}; font: 500 12px/1 inherit; border-top: 1px solid ${THEME.glassBorder}22; }
 .sf-restore-dismissed { background: none; border: none; color: ${THEME.green}; font: 600 12px/1 inherit; cursor: pointer; text-decoration: underline; }
 .sf-badge.coverage-exact { background: ${THEME.green}18; color: ${THEME.green}; border-color: ${THEME.green}33; }
@@ -2743,11 +2751,14 @@
     _tabsHtml() {
       if (this._currentHostBlock()) return "";
       this._ensureCurrentSource();
-      return this._enabledSourceNames().map(source => {
+      const allActive = this.currentService === "_all";
+      const allTab = `<button class="sf-tab ${allActive ? 'active' : ''}" role="tab" aria-selected="${allActive}" data-service="_all">All</button>`;
+      const sourceTabs = this._enabledSourceNames().map(source => {
         const active = source === this.currentService;
         const cls = ["sf-tab", this._serviceClass(source), active ? "active" : ""].filter(Boolean).join(" ");
         return `<button class="${cls}" role="tab" aria-selected="${active}" data-service="${source}">${escapeHtml(SOURCE_META[source].tab)}</button>`;
       }).join("");
+      return allTab + sourceTabs;
     }
 
     _sourceSettingsHtml() {
@@ -3022,9 +3033,9 @@
         const tab = e.target.closest(".sf-tab");
         if (!tab) return;
         const svc = tab.dataset.service;
-        if (svc !== this.currentService && this._isSourceEnabled(svc)) {
+        if (svc !== this.currentService && (svc === "_all" || this._isSourceEnabled(svc))) {
           this.currentService = svc;
-          this.settings.set("lastService", svc);
+          if (svc !== "_all") this.settings.set("lastService", svc);
           this._updateTabs();
           this._loadScripts();
         }
@@ -3569,6 +3580,56 @@
       });
     }
 
+    async _loadAllSources() {
+      if (this.isLoading) return;
+      this.isLoading = true;
+      this.content.setAttribute("aria-busy", "true");
+      _safeHTML(this.content, `<div class="sf-loading"><div class="sf-spinner"></div><div class="sf-loading-text">Searching all sources...</div></div>`);
+
+      const host = HostService.getCurrentHost();
+      this.currentDomain = host;
+      const queryHost = this._resolveQueryHost(host);
+      const enabled = this._enabledSourceNames();
+      const results = [];
+      const seen = new Set();
+
+      const promises = enabled.map(async source => {
+        try {
+          const scripts = await this.services[source].searchScriptsByHost(queryHost, this.settings);
+          const health = scripts?._sfHealth || { type: "ok", title: `${SOURCE_META[source].label} loaded`, checkedAt: Date.now() };
+          this._recordSourceHealth(source, health);
+          return Array.isArray(scripts) ? scripts : [];
+        } catch (err) {
+          this._recordSourceHealth(source, {
+            type: err?.kind === "rate-limit" ? "rate-limited" : "failed",
+            title: `${SOURCE_META[source].label} failed`,
+            detail: err?.message || "Unknown error",
+            checkedAt: Date.now()
+          });
+          return [];
+        }
+      });
+
+      const allResults = await Promise.all(promises);
+      for (const batch of allResults) {
+        for (const script of batch) {
+          const key = script.url || script.code_url || script._full_name || script.name;
+          if (key && !seen.has(key)) {
+            seen.add(key);
+            results.push(script);
+          }
+        }
+      }
+
+      if (this.currentService !== "_all") { this.isLoading = false; return; }
+      this.allScripts = results;
+      this.sourceStatus = null;
+      this._setResultCount(results.length);
+      this._displayScripts();
+      this.isLoading = false;
+      this.content.setAttribute("aria-busy", "false");
+    }
+
     _resolveQueryHost(host) {
       switch (this.queryMode) {
         case "exact": return HostService.normalizeHost(host);
@@ -3590,6 +3651,7 @@
         this._showHostBlocked(hostBlock);
         return;
       }
+      if (this.currentService === "_all") return this._loadAllSources();
       if (this.isLoading) return;
       this._ensureCurrentSource();
       if (!this._isSourceEnabled(this.currentService)) {
@@ -3681,7 +3743,7 @@
       const noticeHtml = this._sourceNoticeHtml();
 
       // Update title
-      const titleType = this.currentService === "catalogs" ? "Catalogs" : this.currentService === "githubgist" ? "Gists" : ["chromewebstore", "mozillaaddons"].includes(this.currentService) ? "Extensions" : "Scripts";
+      const titleType = this.currentService === "_all" ? "Results" : this.currentService === "catalogs" ? "Catalogs" : this.currentService === "githubgist" ? "Gists" : ["chromewebstore", "mozillaaddons"].includes(this.currentService) ? "Extensions" : "Scripts";
       this.modal.querySelector(".sf-modal-title").textContent = `${titleType} for ${displayHost}`;
 
       if (this.searchQuery) {
@@ -3740,12 +3802,14 @@
 
     _renderChunked(items, svcClass) {
       if (this._chunkTimer) { cancelAnimationFrame(this._chunkTimer); this._chunkTimer = null; }
+      const isAll = this.currentService === "_all";
       const CHUNK = 30;
       let offset = 0;
       const renderBatch = () => {
         const end = Math.min(offset + CHUNK, items.length);
         for (let i = offset; i < end; i++) {
-          this.content.appendChild(this._createScriptItem(items[i], svcClass, i));
+          const itemClass = isAll ? this._serviceClass(items[i]._source || "greasyfork") : svcClass;
+          this.content.appendChild(this._createScriptItem(items[i], itemClass, i));
         }
         offset = end;
         if (offset < items.length) {
@@ -4099,6 +4163,7 @@
           <div class="sf-script-info">
             <a href="${escapeHtml(scriptUrl)}" target="_blank" class="sf-script-title" title="${escapeHtml(script.name || '')}">${escapeHtml(script.name || "Untitled")}</a>
             <div class="sf-script-sub">
+              ${this.currentService === "_all" && script._source ? `<span class="sf-source-badge ${this._serviceClass(script._source)}" title="Source">${escapeHtml(SOURCE_META[script._source]?.tab || script._source)}</span><span class="sf-dot">&bull;</span>` : ""}
               ${author ? `<span title="${isGH || isGist ? 'Owner' : isCatalog ? 'Catalog' : 'Author'}">${getIcon('user')} ${escapeHtml(author)}</span>` : ""}
               ${author && script.version ? `<span class="sf-dot">&bull;</span>` : ""}
               ${script.version ? `<span title="Version">${getIcon('gitBranch')} v${escapeHtml(script.version)}</span>` : ""}
