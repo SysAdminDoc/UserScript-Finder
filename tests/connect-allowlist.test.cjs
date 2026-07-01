@@ -5,6 +5,8 @@ const path = require("node:path");
 const repoRoot = path.resolve(__dirname, "..");
 const userscript = fs.readFileSync(path.join(repoRoot, "UserScript-Finder.user.js"), "utf8");
 const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+const changelog = fs.readFileSync(path.join(repoRoot, "CHANGELOG.md"), "utf8");
+const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 
 const headerEnd = userscript.indexOf("// ==/UserScript==");
 const header = userscript.slice(0, headerEnd);
@@ -121,6 +123,20 @@ if (updateUrl && !updateUrl.startsWith("https://raw.githubusercontent.com/")) {
 }
 if (downloadUrl && updateUrl) {
   console.log("OK: @downloadURL and @updateURL point to raw GitHub");
+}
+
+if (versionHeader && !changelog.includes(`[v${versionHeader}]`)) {
+  console.error(`FAIL: CHANGELOG.md missing entry for v${versionHeader}`);
+  failures++;
+} else if (versionHeader) {
+  console.log(`OK: CHANGELOG has entry for v${versionHeader}`);
+}
+
+if (versionHeader && pkg.version !== versionHeader) {
+  console.error(`FAIL: package.json version (${pkg.version}) does not match header (${versionHeader})`);
+  failures++;
+} else if (versionHeader) {
+  console.log(`OK: package.json version matches (${pkg.version})`);
 }
 
 console.log(`\n${failures ? "FAILED" : "PASSED"} — ${failures} issue(s) found`);
