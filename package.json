@@ -1,7 +1,7 @@
 {
   "private": true,
   "name": "userscript-finder",
-  "version": "1.22.0",
+  "version": "1.23.0",
   "description": "Finds userscripts and extension alternatives for the current domain",
   "scripts": {
     "test": "node tests/run-all.cjs"

@@ -2,6 +2,10 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.23.0] - 2026-07-01
+
+- Added per-domain dismissed scripts with a dismiss button on each result, persistent hidden-script storage via GM_setValue, and a "Show all" restore button at the bottom of filtered results.
+
 ## [v1.22.0] - 2026-07-01
 
 - Added red "Stale" badge for userscript, GitHub, and Gist results not updated in 2+ years.
