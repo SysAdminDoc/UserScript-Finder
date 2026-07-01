@@ -230,6 +230,7 @@
     arrowsHorizontal: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M237.66,133.66l-32,32a8,8,0,0,1-11.32-11.32L212.69,136H43.31l18.35,18.34a8,8,0,0,1-11.32,11.32l-32-32a8,8,0,0,1,0-11.32l32-32a8,8,0,0,1,11.32,11.32L43.31,120H212.69l-18.35-18.34a8,8,0,0,1,11.32-11.32l32,32A8,8,0,0,1,237.66,133.66Z"></path></svg>',
     rows: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M208,136H48a16,16,0,0,0-16,16v40a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V152A16,16,0,0,0,208,136Zm0,56H48V152H208v40Zm0-144H48A16,16,0,0,0,32,64v40a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V64A16,16,0,0,0,208,48Zm0,56H48V64H208v40Z"></path></svg>',
     undo: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a96,96,0,0,1-96,96H48a8,8,0,0,1,0-16h80a80,80,0,0,0,0-160H67.31l18.35,18.34A8,8,0,0,1,74.34,77.66l-32-32a8,8,0,0,1,0-11.32l32-32A8,8,0,0,1,85.66,13.66L67.31,32H128A96.11,96.11,0,0,1,224,128Z"></path></svg>',
+    warning: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M236.8,188.09,149.35,36.22h0a24.76,24.76,0,0,0-42.7,0L19.2,188.09a23.51,23.51,0,0,0,0,23.72A24.35,24.35,0,0,0,40.55,224h174.9a24.35,24.35,0,0,0,21.33-12.19A23.51,23.51,0,0,0,236.8,188.09ZM120,104a8,8,0,0,1,16,0v40a8,8,0,0,1-16,0Zm8,88a12,12,0,1,1,12-12A12,12,0,0,1,128,192Z"></path></svg>',
     githubLogo: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24,40,40,0,0,0-40-40,8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.55a43.82,43.82,0,0,1,.79-33.58,43.86,43.86,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.86,43.86,0,0,1,32.32-20.06A43.82,43.82,0,0,1,192,73.55a8,8,0,0,0,1.13,7.92A41.74,41.74,0,0,1,200,104Z"></path></svg>',
     gitFork: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M224,64a32,32,0,1,0-40,31v17a8,8,0,0,1-8,8H80a8,8,0,0,1-8-8V95a32,32,0,1,0-16,0v17a24,24,0,0,0,24,24h40v25a32,32,0,1,0,16,0V136h40a24,24,0,0,0,24-24V95A32.06,32.06,0,0,0,224,64ZM48,64A16,16,0,1,1,64,80,16,16,0,0,1,48,64Zm96,128a16,16,0,1,1-16-16A16,16,0,0,1,144,192ZM192,80a16,16,0,1,1,16-16A16,16,0,0,1,192,80Z"></path></svg>'
   };
@@ -2419,6 +2420,7 @@
 .sf-badge.score-high { background: ${THEME.green}18; color: ${THEME.green}; border-color: ${THEME.green}33; }
 .sf-badge.score-mid { background: ${THEME.yellow}18; color: ${THEME.yellow}; border-color: ${THEME.yellow}33; }
 .sf-badge.score-low { background: ${THEME.red}18; color: ${THEME.red}; border-color: ${THEME.red}33; }
+.sf-badge.stale-flag { background: ${THEME.red}18; color: ${THEME.red}; border-color: ${THEME.red}33; }
 .sf-badge.coverage-exact { background: ${THEME.green}18; color: ${THEME.green}; border-color: ${THEME.green}33; }
 .sf-badge.coverage-broad { background: ${THEME.yellow}18; color: ${THEME.yellow}; border-color: ${THEME.yellow}33; }
 .sf-badge.coverage-uncertain { background: ${THEME.surface2}; color: ${THEME.subtext1}; border-color: ${THEME.glassBorder}; }
@@ -3835,6 +3837,8 @@
       const installWarning = installValidation && !installValidation.ok ? `Install blocked: ${installValidation.reason}` : "";
 
       const fanClass = fanScore >= 8 ? "score-high" : fanScore >= 6 ? "score-mid" : fanScore >= 0 ? "score-low" : "";
+      const TWO_YEARS = 2 * 365 * 24 * 60 * 60 * 1000;
+      const isStale = script.code_updated_at && (Date.now() - new Date(script.code_updated_at).getTime()) > TWO_YEARS;
 
       const badge = (icon, text, title, cls = "") => {
         if (!text) return "";
@@ -3853,6 +3857,7 @@
           ${lang ? badge("gitBranch", lang, "Language") : ""}
           ${badge("clockwise", updated, "Updated")}
           ${badge("calendarPlus", created, "Created")}
+          ${isStale ? badge("warning", "Stale", "Last updated more than 2 years ago", "stale-flag") : ""}
         `;
       } else if (isGist) {
         const stars = formatNumber(script._stars);
@@ -3863,6 +3868,7 @@
           ${badge("star", stars, "Stars")}
           ${badge("gitFork", forks, "Forks")}
           ${badge("clockwise", updated, "Last active")}
+          ${isStale ? badge("warning", "Stale", "Last updated more than 2 years ago", "stale-flag") : ""}
         `;
       } else if (isCatalog) {
         metaHtml = `
@@ -3891,6 +3897,7 @@
           ${badge("search", script._hostCoverageLabel, script._hostCoverageDetail || "Host coverage", script._hostCoverageClass || "")}
           ${badge("clockwise", updated, "Updated")}
           ${badge("calendarPlus", created, "Created")}
+          ${isStale ? badge("warning", "Stale", "Last updated more than 2 years ago", "stale-flag") : ""}
         `;
       }
 
