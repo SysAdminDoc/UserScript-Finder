@@ -4,20 +4,15 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
 
 ## Planned Features
 
-### Results UX
-- One-click install button (opens the raw `.user.js` to the user's userscript manager)
-
 ### Discovery Features
 - "Already-installed" badge — query `GM_info` / compare to installed scripts, don't re-suggest
 - Trending-for-site panel: show what other users of this domain tend to install
 - Related sites: if the script supports youtube.com, suggest it on youtu.be and music.youtube.com
-- Dark/light theme toggle synced with the host page's `prefers-color-scheme`
 
 ### Safety & Trust
 - Source-code preview with syntax highlighting before install
-- Author reputation score (fork count / total installs / age of account)
 - Flag scripts that request dangerous `@grant` (GM_xmlhttpRequest to arbitrary hosts, unsafeWindow)
-- Show last-updated red flag when > 2 years stale
+- Show last-updated red flag when > 2 years stale (userscript sources; extension badges already show stale warnings)
 
 ### Persistence
 - Remember dismissed scripts per domain
@@ -184,13 +179,6 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
   Complexity: L
 
 ## Research-Driven Additions
-
-- [ ] P1 - Reconcile stale legacy roadmap rows
-  Why: `ROADMAP.md` still lists shipped install and author-reputation work, which can send dev agents back into completed behavior.
-  Evidence: `ROADMAP.md:8`, `ROADMAP.md:18`; `README.md:72`; `CHANGELOG.md` v1.6.0 and v1.10.0.
-  Touches: `ROADMAP.md` after verification against `UserScript-Finder.user.js`, `README.md`, and `CHANGELOG.md`.
-  Acceptance: Completed legacy rows are deleted or rewritten into still-incomplete variants; remaining roadmap entries do not duplicate v1.0-v1.19 changelog items.
-  Complexity: S
 
 - [ ] P2 - Add live fixture refresh for source parser drift
   Why: Registry/store HTML and API shapes change, and current fixtures prove known parser shapes but do not provide a safe refresh path.
