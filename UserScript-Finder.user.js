@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.27.0
+// @version      1.28.0
 // @description  Finds userscripts and extension alternatives for the current domain
 // @author       SysAdminDoc
 // @match        *://*/*
@@ -3844,7 +3844,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
             <div class="sf-empty">
               <div class="sf-empty-title">No scripts found</div>
               <div class="sf-empty-text">Nothing matched <strong>${escapeHtml(displayHost)}</strong> on ${svcLabel}.</div>
-              <a href="${escapeHtml(directUrl)}" target="_blank" class="sf-action-btn ${svcClass}">Search manually</a>
+              ${svc ? `<a href="${escapeHtml(directUrl)}" target="_blank" class="sf-action-btn ${svcClass}">Search manually</a>` : ""}
             </div>
           `);
         }

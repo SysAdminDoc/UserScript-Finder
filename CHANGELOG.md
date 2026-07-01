@@ -2,6 +2,34 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [v1.28.0] - 2026-07-01
+
+### Fixed
+- Fix _loadAllSources blocking subsequent tab clicks (isLoading stuck true during parallel fetches); added generation counter to discard stale loads
+- Fix duplicate language filter listener causing double re-render on every language filter change
+- Fix _sourceNoticeHtml crash when currentService is _all (undefined service has no getDirectSearchUrl)
+- Fix _displayScripts crash when _all mode returns empty results
+- Fix _fetchPreviewSource missing timeout (Coverage/Install buttons could hang indefinitely)
+- Fix _renderChunked stale-frame race where old items append to cleared content between _safeHTML and rAF cancel
+- Fix click-to-open guard missing queue/preview/dismiss buttons (relied only on stopPropagation)
+- Fix settings import accepting arbitrary keys (now validates against DEFAULT_SETTINGS)
+- Fix scriptUrl allowing non-HTTP protocols from API responses for GH/Gist/Catalog sources
+- Fix relativeTime showing misleading "just now" for future dates (clock skew)
+- Fix footer showing "_all" text and broken link in All mode
+- Fix result count saying "scripts" for mixed All-mode results (now "results")
+- Fix empty state showing generic "Source" label in All mode
+- Fix "Search manually" button showing broken # link in All mode empty state
+
+### Improved
+- Add prefers-reduced-motion support (disables all animations and transitions)
+- Add focus-visible outline for all interactive elements in shadow DOM
+- Add aria-label/aria-pressed to dense mode toggle and All tab
+- Increase queue/dismiss button touch targets from ~24px to ~32px
+- Rename sort bar "Search" label to "Mode" for clearer semantics
+- Deduplicate _cleanText into shared cleanText() utility (4 copies removed)
+- Remove 3 dead wrapper methods never called from any code path
+- Clean up .gitignore duplicate blocks and CHANGELOG formatting
+
 ## [v1.27.0] - 2026-07-01
 
 - Added UI string catalog centralizing modal titles, toasts, empty states, disclosure text, and button labels for localization readiness.
