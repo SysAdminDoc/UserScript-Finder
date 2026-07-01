@@ -281,6 +281,8 @@
   function getIcon(name) { return ICONS[name] || ''; }
 
   // ── Utility ─────────────────────────────────────────────────────────
+  function cleanText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
+
   function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text || "";
@@ -1270,13 +1272,13 @@
 
       return {
         _source: "openuserjs",
-        name: this._cleanText(link.textContent) || "Untitled",
-        description: this._cleanText(descEl?.textContent) || "",
+        name: cleanText(link.textContent) || "Untitled",
+        description: cleanText(descEl?.textContent) || "",
         url: this.baseUrl + pagePath,
         code_url: this.baseUrl + installPath,
-        version: this._cleanText(versionEl?.textContent) || null,
+        version: cleanText(versionEl?.textContent) || null,
         license: null,
-        users: [{ name: this._cleanText(authorLink?.textContent) || authorFromPath || null }],
+        users: [{ name: cleanText(authorLink?.textContent) || authorFromPath || null }],
         daily_installs: null,
         total_installs: this._parseNumber(cells[1]?.textContent),
         good_ratings: this._parseNumber(cells[2]?.textContent),
@@ -1303,7 +1305,7 @@
       catch { return segment; }
     }
 
-    _cleanText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
+
 
     getDirectSearchUrl(domain) {
       return `${this.baseUrl}/?q=${encodeURIComponent(domain)}`;
@@ -1413,7 +1415,7 @@
 
     _normalize(record) {
       const id = record[0];
-      const name = this._cleanText(record[2] || record[19]);
+      const name = cleanText(record[2] || record[19]);
       if (!id || !name) return null;
 
       const manifest = this._parseManifest(record[18]);
@@ -1430,7 +1432,7 @@
       return {
         _source: "chromewebstore",
         name,
-        description: this._cleanText(record[6] || manifest.description) || "",
+        description: cleanText(record[6] || manifest.description) || "",
         url: `${this.baseUrl}/detail/${this._slugify(name)}/${id}`,
         code_url: null,
         version: manifest.version || null,
@@ -1464,10 +1466,10 @@
     }
 
     _slugify(text) {
-      return this._cleanText(text).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "extension";
+      return cleanText(text).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "extension";
     }
 
-    _cleanText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
+
 
     getDirectSearchUrl(domain) {
       return `${this.baseUrl}/search/${encodeURIComponent(domain)}?hl=en`;
@@ -1791,8 +1793,8 @@
       const mainLink = summary?.querySelector("a[href]");
       if (!summary || !mainLink) return null;
 
-      const name = this._cleanText(mainLink.textContent) || "Curated userscript";
-      const summaryText = this._cleanText(summary.textContent);
+      const name = cleanText(mainLink.textContent) || "Curated userscript";
+      const summaryText = cleanText(summary.textContent);
       const description = this._descriptionFromSummary(summaryText, name);
       const installLink = Array.from(doc.querySelectorAll("a[href]")).find(link => {
         const href = link.getAttribute("href") || "";
@@ -1828,12 +1830,12 @@
       const before = markdown.slice(0, index);
       const headings = before.match(/^###\s+.*$/gmi);
       if (!headings?.length) return null;
-      return this._cleanText(headings[headings.length - 1].replace(/^###\s+/, "").replace(/<[^>]*>/g, " "));
+      return cleanText(headings[headings.length - 1].replace(/^###\s+/, "").replace(/<[^>]*>/g, " "));
     }
 
     _strongAwesomeMatch(block, domain, siteKey) {
       const doc = new DOMParser().parseFromString(`<div>${block}</div>`, "text/html");
-      const summaryTitle = this._cleanText(doc.querySelector("summary a[href]")?.textContent);
+      const summaryTitle = cleanText(doc.querySelector("summary a[href]")?.textContent);
       const hrefs = Array.from(doc.querySelectorAll("a[href]")).map(link => link.getAttribute("href") || "").join(" ");
       return this._textMatches(`${summaryTitle} ${hrefs}`, domain, siteKey);
     }
@@ -1862,7 +1864,7 @@
       catch { return href || null; }
     }
 
-    _cleanText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
+
 
     getDirectSearchUrl(domain) {
       return this._userscriptZoneUrl(domain);
@@ -1968,11 +1970,11 @@
 
       const owner = this._decodePathSegment(match[1]);
       const id = match[2];
-      const fileName = this._cleanText(fileLink.querySelector(".css-truncate-target")?.textContent) || id;
+      const fileName = cleanText(fileLink.querySelector(".css-truncate-target")?.textContent) || id;
       const updatedEl = snippet.querySelector("relative-time[datetime]");
       const descEl = snippet.querySelector(".gist-snippet-meta span.f6.color-fg-muted");
       const fileCount = this._parseStat(snippet, /files?/i);
-      const description = this._cleanText(descEl?.textContent) ||
+      const description = cleanText(descEl?.textContent) ||
         this._extractMetadata(snippet, "description") ||
         `${this._fileLabel(fileCount)} on GitHub Gist`;
       const isUserScript = /\.user\.js$/i.test(fileName);
@@ -2005,15 +2007,15 @@
     _extractMetadata(snippet, key) {
       const matcher = new RegExp(`@${key}\\s+([^\\n\\r<]+)`, "i");
       const text = Array.from(snippet.querySelectorAll(".blob-code-inner, .blob-code"))
-        .map(el => this._cleanText(el.textContent))
+        .map(el => cleanText(el.textContent))
         .join("\n");
       const match = text.match(matcher);
-      return match ? this._cleanText(match[1]) : null;
+      return match ? cleanText(match[1]) : null;
     }
 
     _parseStat(snippet, labelPattern) {
       const stat = Array.from(snippet.querySelectorAll(".gist-snippet-meta li")).find(li =>
-        labelPattern.test(this._cleanText(li.textContent))
+        labelPattern.test(cleanText(li.textContent))
       );
       return this._parseNumber(stat?.textContent);
     }
@@ -2040,7 +2042,7 @@
       catch { return segment; }
     }
 
-    _cleanText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
+
 
     getDirectSearchUrl(domain) {
       return `${this.baseUrl}/search?q=${encodeURIComponent(domain + ' userscript')}`;
@@ -4068,18 +4070,6 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 
     _parseMatchCoverage(source, host, currentUrl) {
       return MatchCoverage.evaluate(source, host, currentUrl);
-    }
-
-    _extractUserScriptMetadata(source) {
-      return MatchCoverage.extractUserScriptMetadata(source);
-    }
-
-    _patternCoversHost(pattern, host, currentUrl) {
-      return MatchCoverage.patternCoversUrl(pattern, currentUrl, String(pattern || "").includes("://") ? "match" : "include");
-    }
-
-    _hostMatchesPattern(host, pattern) {
-      return MatchCoverage.hostMatchesPattern(host, pattern);
     }
 
     async _openInstallTarget(script, button) {
