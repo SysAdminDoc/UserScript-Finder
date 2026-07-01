@@ -2430,6 +2430,9 @@
 .sf-badge.score-mid { background: ${THEME.yellow}18; color: ${THEME.yellow}; border-color: ${THEME.yellow}33; }
 .sf-badge.score-low { background: ${THEME.red}18; color: ${THEME.red}; border-color: ${THEME.red}33; }
 .sf-badge.stale-flag { background: ${THEME.red}18; color: ${THEME.red}; border-color: ${THEME.red}33; }
+.sf-queue-btn { background: none; border: none; color: ${THEME.overlay}; cursor: pointer; padding: 4px; border-radius: 6px; transition: color 0.15s, background 0.15s; flex-shrink: 0; }
+.sf-queue-btn:hover { color: ${THEME.yellow}; background: ${THEME.yellow}18; }
+.sf-queue-btn.queued { color: ${THEME.yellow}; }
 .sf-dismiss-btn { background: none; border: none; color: ${THEME.overlay}; cursor: pointer; padding: 4px; border-radius: 6px; transition: color 0.15s, background 0.15s; flex-shrink: 0; }
 .sf-dismiss-btn:hover { color: ${THEME.red}; background: ${THEME.red}18; }
 .sf-dismissed-notice { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; color: ${THEME.subtext0}; font: 500 12px/1 inherit; border-top: 1px solid ${THEME.glassBorder}22; }
@@ -3760,6 +3763,35 @@
       }
     }
 
+    _getQueue() {
+      return gmGetValue("sf_queue", []) || [];
+    }
+
+    _isQueued(script) {
+      const key = this._scriptKey(script);
+      return this._getQueue().some(q => q.key === key);
+    }
+
+    _toggleQueued(script) {
+      const key = this._scriptKey(script);
+      const queue = this._getQueue();
+      const idx = queue.findIndex(q => q.key === key);
+      if (idx >= 0) {
+        queue.splice(idx, 1);
+        gmSetValue("sf_queue", queue);
+        return false;
+      }
+      queue.push({
+        key,
+        name: script.name || "Untitled",
+        url: script.url || script.code_url || "",
+        source: script._source || "",
+        addedAt: new Date().toISOString()
+      });
+      gmSetValue("sf_queue", queue);
+      return true;
+    }
+
     _parseFieldedQuery(raw) {
       const fields = [];
       const textParts = [];
@@ -4020,8 +4052,10 @@
         actionBtn = "";
       }
       const previewBtn = safeInstallUrl ? `<button class="sf-preview-btn" data-url="${escapeHtml(safeInstallUrl)}" title="Preview match coverage">${getIcon('search')} Coverage</button>` : "";
+      const queued = this._isQueued(script);
+      const queueBtn = `<button class="sf-queue-btn ${queued ? 'queued' : ''}" title="${queued ? 'Remove from queue' : 'Queue to try later'}" aria-label="${queued ? 'Remove from queue' : 'Queue to try'}" aria-pressed="${queued}">${getIcon('calendarPlus')}</button>`;
       const dismissBtn = `<button class="sf-dismiss-btn" title="Hide this result" aria-label="Dismiss ${escapeHtml(script.name || 'script')}">${getIcon('x')}</button>`;
-      const actionsHtml = `<div class="sf-script-actions">${actionBtn}${previewBtn}${dismissBtn}</div>`;
+      const actionsHtml = `<div class="sf-script-actions">${actionBtn}${previewBtn}${queueBtn}${dismissBtn}</div>`;
 
       _safeHTML(item, `
         <div class="sf-script-top">
@@ -4058,6 +4092,19 @@
         previewEl.addEventListener("click", (e) => {
           e.stopPropagation();
           this._toggleMatchPreview(script, previewPane, previewEl);
+        });
+      }
+
+      // Queue handler
+      const queueEl = item.querySelector(".sf-queue-btn");
+      if (queueEl) {
+        queueEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const isQueued = this._toggleQueued(script);
+          queueEl.classList.toggle("queued", isQueued);
+          queueEl.setAttribute("aria-pressed", String(isQueued));
+          queueEl.title = isQueued ? "Remove from queue" : "Queue to try later";
+          this.toast.show(isQueued ? "Queued to try later" : "Removed from queue");
         });
       }
 
