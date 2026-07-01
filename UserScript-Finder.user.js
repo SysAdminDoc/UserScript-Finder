@@ -13,6 +13,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
+// @grant        GM_addValueChangeListener
 // @icon         https://raw.githubusercontent.com/SysAdminDoc/UserScript-Finder/main/img/icon.png
 // @connect      greasyfork.org
 // @connect      update.greasyfork.org
@@ -875,6 +876,32 @@
     saveSettings() { gmSetValue("sf_settings_v4", this.settings); }
     get(key) { return this.settings[key]; }
     set(key, value) { this.settings[key] = value; this.saveSettings(); }
+
+    watchForChanges(callback) {
+      const listener = gmFunction("GM_addValueChangeListener");
+      if (listener) {
+        try {
+          listener("sf_settings_v4", (_name, _oldVal, newVal, remote) => {
+            if (!remote || !newVal) return;
+            this.settings = { ...DEFAULT_SETTINGS, ...newVal };
+            this.settings.sources = this.normalizeSources(newVal.sources);
+            callback();
+          });
+          return;
+        } catch {}
+      }
+      let lastJson = JSON.stringify(this.settings);
+      setInterval(() => {
+        const saved = gmGetValue("sf_settings_v4", {}) || {};
+        const json = JSON.stringify(saved);
+        if (json !== lastJson) {
+          lastJson = json;
+          this.settings = { ...DEFAULT_SETTINGS, ...saved };
+          this.settings.sources = this.normalizeSources(saved.sources);
+          callback();
+        }
+      }, 3000);
+    }
   }
 
   // ── Host Service ────────────────────────────────────────────────────
@@ -2598,6 +2625,39 @@
         return;
       }
       this._setupMenuCommands();
+      this.settings.watchForChanges(() => this._onSettingsChanged());
+    }
+
+    _onSettingsChanged() {
+      this._ensureCurrentSource();
+      this._setupMenuCommands();
+      if (this.uiBuilt) {
+        this._syncSettingsUi();
+        this._renderTabs();
+        this._updateTabs();
+      }
+    }
+
+    _syncSettingsUi() {
+      this.modal.querySelectorAll(".sf-source-toggle").forEach(btn => {
+        const source = btn.dataset.source;
+        const enabled = this._isSourceEnabled(source);
+        btn.classList.toggle("on", enabled);
+        btn.setAttribute("aria-pressed", String(enabled));
+      });
+      this.modal.querySelectorAll(".sf-toggle[data-key]").forEach(btn => {
+        const key = btn.dataset.key;
+        const val = !!this.settings.get(key);
+        btn.classList.toggle("on", val);
+        btn.setAttribute("aria-pressed", String(val));
+      });
+      this.modal.querySelectorAll(".sf-setting-select").forEach(sel => {
+        const key = sel.dataset.key;
+        const val = this.settings.get(key);
+        if (val != null) sel.value = String(val);
+      });
+      const denseMode = this.settings.get("denseMode");
+      this.host.classList.toggle("dense", !!denseMode);
     }
 
     _ensureUI() {
