@@ -15,7 +15,6 @@ All notable changes to UserScript-Finder will be documented in this file.
 
 ## [v1.25.0] - 2026-07-01
 
-- Added search mode selector (Auto/Exact host/Root domain/Keyword) for query control with persistent mode selection.
 - Added rendered modal smoke tests at desktop (1280x800) and mobile (375x667) widths verifying no overflow, clipping, or missing controls.
 
 ## [v1.24.0] - 2026-07-01
@@ -127,7 +126,7 @@ All notable changes to UserScript-Finder will be documented in this file.
 
 - Added OpenUserJS as a fourth source with search, install handoff, menu entry, modal tab, source accent, and README coverage.
 
-## [v1.0.0] - %Y->- (HEAD -> main, origin/main, origin/HEAD)
+## [v1.0.0] - 2026-06-27
 
 - README: add related tools section differentiating from UserScriptHunt
 - Removed: Delete UserScript Finder-1.0.0.user.js

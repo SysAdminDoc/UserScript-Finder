@@ -2140,6 +2140,9 @@
   from { opacity: 1; transform: translateY(0) scale(1); }
   to { opacity: 0; transform: translateY(10px) scale(0.97); }
 }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
 
 /* ── TOAST ── */
 .sf-toast {
@@ -2795,7 +2798,7 @@
       if (this._currentHostBlock()) return "";
       this._ensureCurrentSource();
       const allActive = this.currentService === "_all";
-      const allTab = `<button class="sf-tab ${allActive ? 'active' : ''}" role="tab" aria-selected="${allActive}" data-service="_all">All</button>`;
+      const allTab = `<button class="sf-tab ${allActive ? 'active' : ''}" role="tab" aria-selected="${allActive}" aria-label="Search all sources" data-service="_all">All</button>`;
       const sourceTabs = this._enabledSourceNames().map(source => {
         const active = source === this.currentService;
         const cls = ["sf-tab", this._serviceClass(source), active ? "active" : ""].filter(Boolean).join(" ");
@@ -3011,7 +3014,7 @@
           <div class="sf-settings-title">Settings</div>
           <div class="sf-setting-row">
             <span class="sf-setting-label">Dense mode</span>
-            <button class="sf-toggle ${this.settings.get('denseMode') ? 'on' : ''}" data-key="denseMode"></button>
+            <button class="sf-toggle ${this.settings.get('denseMode') ? 'on' : ''}" data-key="denseMode" aria-label="Dense mode" aria-pressed="${this.settings.get('denseMode') ? 'true' : 'false'}"></button>
           </div>
           <div class="sf-setting-row">
             <span class="sf-setting-label">Default sort</span>
@@ -3108,11 +3111,6 @@
         });
       });
 
-      this.modal.querySelector(".sf-lang-filter")?.addEventListener("change", e => {
-        this.filters.languageFilter = e.target.value;
-        this._displayScripts();
-      });
-
       // Search filter
       this.searchInput.addEventListener("input", e => {
         this.searchQuery = e.target.value.toLowerCase().trim();
@@ -3182,7 +3180,10 @@
           try {
             const imported = JSON.parse(reader.result);
             if (typeof imported !== "object" || imported === null) throw new Error("Invalid settings");
-            Object.entries(imported).forEach(([key, value]) => this.settings.set(key, value));
+            const allowedKeys = new Set(Object.keys(DEFAULT_SETTINGS));
+            Object.entries(imported).forEach(([key, value]) => {
+              if (allowedKeys.has(key)) this.settings.set(key, value);
+            });
             this._ensureCurrentSource();
             this._setupMenuCommands();
             this._syncSettingsUi();
@@ -3370,7 +3371,8 @@
       if (this.sourceStatus) {
         const status = this.sourceStatus;
         const cls = status.type === "stale" || status.type === "partial" ? "warn" : "bad";
-        const directUrl = this.services[this.currentService].getDirectSearchUrl(this.currentDomain);
+        const svc = this.services[this.currentService];
+        const directUrl = svc ? svc.getDirectSearchUrl(this.currentDomain) : "#";
         notices.push(`
           <div class="sf-source-notice ${cls}">
             <div class="sf-source-notice-title">${escapeHtml(status.title || "Source status")}</div>
@@ -3624,8 +3626,7 @@
     }
 
     async _loadAllSources() {
-      if (this.isLoading) return;
-      this.isLoading = true;
+      this.isLoading = false;
       this.content.setAttribute("aria-busy", "true");
       _safeHTML(this.content, `<div class="sf-loading"><div class="sf-spinner"></div><div class="sf-loading-text">${STRINGS.loadingAllSources}</div></div>`);
 
@@ -3664,12 +3665,11 @@
         }
       }
 
-      if (this.currentService !== "_all") { this.isLoading = false; return; }
+      if (this.currentService !== "_all") return;
       this.allScripts = results;
       this.sourceStatus = null;
       this._setResultCount(results.length);
       this._displayScripts();
-      this.isLoading = false;
       this.content.setAttribute("aria-busy", "false");
     }
 
@@ -4113,7 +4113,8 @@
       const created = relativeTime(script.created_at);
       const author = script.users?.[0]?.name || null;
       const baseUrls = { sleazyfork: "https://sleazyfork.org", greasyfork: "https://greasyfork.org", openuserjs: "https://openuserjs.org" };
-      const scriptUrl = (isGH || isGist || isCatalog) ? script.url : (script.url?.startsWith("http") ? script.url : (baseUrls[svcClass] || baseUrls.greasyfork) + (script.url || ""));
+      const rawUrl = (isGH || isGist || isCatalog) ? script.url : (script.url?.startsWith("http") ? script.url : (baseUrls[svcClass] || baseUrls.greasyfork) + (script.url || ""));
+      const scriptUrl = rawUrl?.startsWith("http") ? rawUrl : "#";
       const installUrl = script.code_url || null;
       const installValidation = installUrl ? InstallSafety.validateInstallUrl(script, installUrl) : null;
       const safeInstallUrl = installValidation?.ok ? installValidation.url : null;
@@ -4267,7 +4268,7 @@
 
       // Click-to-open script page
       item.addEventListener("click", (e) => {
-        if (e.target.closest("a") || e.target.closest(".sf-install-btn") || e.target.closest(".sf-dismiss-btn")) return;
+        if (e.target.closest("a") || e.target.closest("button")) return;
         this._openUrl(scriptUrl);
       });
 
