@@ -70,6 +70,7 @@ Click your userscript manager icon on any website and pick a source to search:
 |---------|-------------|
 | **Eight Sources + All** | Search GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, curated catalogs, GitHub Gists, and GitHub from a single interface — or query all enabled sources at once with deduplicated results |
 | **One-Click Install** | Install scripts directly from registries and `.user.js` Gists without leaving the page |
+| **Source Preview** | View fetched installable `.user.js` source with bounded syntax highlighting before installing |
 | **Install Safety** | Validates install origins, `.user.js` metadata, and dangerous `@grant` requests before opening a userscript-manager install handoff; unsafe candidates become View actions with inline warnings |
 | **Stale Script Warning** | Flags userscript, GitHub, and Gist results with a red "Stale" badge when last updated more than 2 years ago |
 | **Live Search Filter** | Real-time filtering within results with match count (e.g., `12/47`) |
@@ -202,7 +203,7 @@ npm install
 npm test
 ```
 
-Runs 18 tests covering adapter contracts, install safety, match coverage, host normalization, accessibility markup, diagnostics markup, source privacy, sensitive host protection, network disclosure, manager compatibility, root fallback coverage, source runtime, modal layout at desktop/mobile widths, settings polling cleanup, load concurrency, storage limits, related-site discovery, and `@connect` allowlist consistency.
+Runs 19 tests covering adapter contracts, install safety, match coverage, host normalization, accessibility markup, diagnostics markup, source privacy, sensitive host protection, network disclosure, manager compatibility, root fallback coverage, source runtime, source previews, modal layout at desktop/mobile widths, settings polling cleanup, load concurrency, storage limits, related-site discovery, and `@connect` allowlist consistency.
 
 ## Contributing
 

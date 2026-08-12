@@ -266,6 +266,7 @@
   const ICONS = {
     moon: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23Z"></path></svg>',
     search: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"></path></svg>',
+    code: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="m160 40-40 40a8 8 0 0 0 11.31 11.31L160 62.63l28.69 28.68A8 8 0 0 0 200 80Zm-64 0L56 80a8 8 0 0 0 11.31 11.31L96 62.63l28.69 28.68A8 8 0 0 0 136 80Zm64 176-40-40a8 8 0 0 0-11.31 11.31L160 216.63l28.69-28.68A8 8 0 0 0 200 176Zm-64 0-40-40a8 8 0 0 0-11.31 11.31L96 216.63l28.69-28.68A8 8 0 0 0 136 176Z"></path></svg>',
     scales: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M239.43,133l-32-80h0a8,8,0,0,0-9.16-4.84L136,62V40a8,8,0,0,0-16,0V65.58L54.26,80.19A8,8,0,0,0,48.57,85h0v.06L16.57,165a7.92,7.92,0,0,0-.57,3c0,23.31,24.54,32,40,32s40-8.69,40-32a7.92,7.92,0,0,0-.57-3L66.92,93.77,120,82V208H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V78.42L187,67.1,160.57,133a7.92,7.92,0,0,0-.57,3c0,23.31,24.54,32,40,32s40-8.69,40-32A7.92,7.92,0,0,0,239.43,133Z"></path></svg>',
     user: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"></path></svg>',
     gitBranch: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256"><path d="M232,64a32,32,0,1,0-40,31v17a8,8,0,0,1-8,8H96a23.84,23.84,0,0,0-8,1.38V95a32,32,0,1,0-16,0v66a32,32,0,1,0,16,0V144a8,8,0,0,1,8-8h88a24,24,0,0,0,24-24V95A32.06,32.06,0,0,0,232,64Z"></path></svg>',
@@ -290,12 +291,53 @@
   function getIcon(name) { return ICONS[name] || ''; }
 
   // ── Utility ─────────────────────────────────────────────────────────
+  const MAX_CODE_PREVIEW_CHARS = 100000;
+  const CODE_KEYWORDS = new Set([
+    "async", "await", "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do",
+    "else", "export", "extends", "finally", "for", "from", "function", "get", "if", "import", "in", "instanceof",
+    "let", "new", "of", "return", "set", "static", "super", "switch", "this", "throw", "try", "typeof", "var",
+    "void", "while", "with", "yield"
+  ]);
+
   function cleanText(text) { return String(text || "").replace(/\s+/g, " ").trim(); }
 
   function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text || "";
     return div.innerHTML;
+  }
+
+  function highlightUserScript(source, limit = MAX_CODE_PREVIEW_CHARS) {
+    const raw = String(source || "");
+    const clipped = raw.slice(0, Math.max(0, limit));
+    const tokenPattern = /(\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|`(?:\\[\s\S]|[^`\\])*`|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|\b(?:async|await|break|case|catch|class|const|continue|debugger|default|delete|do|else|export|extends|finally|for|from|function|get|if|import|in|instanceof|let|new|of|return|set|static|super|switch|this|throw|try|typeof|var|void|while|with|yield|true|false|null|undefined)\b|\b\d+(?:\.\d+)?\b)/g;
+    let html = "";
+    let lastIndex = 0;
+    let match;
+    while ((match = tokenPattern.exec(clipped))) {
+      html += escapeHtml(clipped.slice(lastIndex, match.index));
+      const token = match[0];
+      const cls = /^\/\//.test(token) || /^\/\*/.test(token)
+        ? "sf-code-token-comment"
+        : /^[`'\"]/.test(token)
+          ? "sf-code-token-string"
+          : /^\d/.test(token)
+            ? "sf-code-token-number"
+            : /^(true|false|null|undefined)$/.test(token)
+              ? "sf-code-token-literal"
+              : CODE_KEYWORDS.has(token)
+                ? "sf-code-token-keyword"
+                : "";
+      html += cls ? `<span class="${cls}">${escapeHtml(token)}</span>` : escapeHtml(token);
+      lastIndex = tokenPattern.lastIndex;
+    }
+    html += escapeHtml(clipped.slice(lastIndex));
+    return {
+      html,
+      truncated: raw.length > clipped.length,
+      sourceLength: raw.length,
+      lineCount: clipped ? clipped.split(/\r?\n/).length : 0
+    };
   }
 
   function relativeTime(iso) {
@@ -2121,7 +2163,8 @@
       matchesLanguageFilter,
       extensionTrustBadges,
       normalizeStringList,
-      hasBroadHostAccess
+      hasBroadHostAccess,
+      highlightUserScript
     });
   }
 
@@ -2486,17 +2529,17 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .sf-script-sub svg { width: 12px; height: 12px; margin-right: 2px; vertical-align: -1px; }
 .sf-dot { opacity: 0.3; font-size: 8px; }
 
-.sf-script-actions { flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
-.sf-install-btn, .sf-preview-btn {
+.sf-script-actions { flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
+.sf-install-btn, .sf-preview-btn, .sf-code-preview-btn {
   flex-shrink: 0; display: flex; align-items: center; gap: 4px;
   padding: 6px 12px; border-radius: 8px; border: none;
   background: ${THEME.green}22; color: ${THEME.green};
   font: 700 11px/1 inherit; cursor: pointer;
   transition: all 0.2s ease; white-space: nowrap;
 }
-.sf-install-btn:hover, .sf-preview-btn:hover { background: ${THEME.green}44; transform: scale(1.04); }
-.sf-install-btn:active, .sf-preview-btn:active { transform: scale(0.96); }
-.sf-install-btn svg, .sf-preview-btn svg { width: 14px; height: 14px; }
+.sf-install-btn:hover, .sf-preview-btn:hover, .sf-code-preview-btn:hover { background: ${THEME.green}44; transform: scale(1.04); }
+.sf-install-btn:active, .sf-preview-btn:active, .sf-code-preview-btn:active { transform: scale(0.96); }
+.sf-install-btn svg, .sf-preview-btn svg, .sf-code-preview-btn svg { width: 14px; height: 14px; }
 .sf-item.sleazyfork .sf-install-btn { background: ${THEME.purple}22; color: ${THEME.purple}; }
 .sf-item.sleazyfork .sf-install-btn:hover { background: ${THEME.purple}44; }
 .sf-item.openuserjs .sf-install-btn { background: ${THEME.openuserjs}22; color: ${THEME.openuserjs}; }
@@ -2513,6 +2556,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .sf-item.github .sf-install-btn:hover { background: ${THEME.github}44; }
 .sf-preview-btn { background: ${THEME.surface1}; color: ${THEME.subtext1}; border: 1px solid ${THEME.glassBorder}; }
 .sf-preview-btn:hover { background: ${THEME.surface2}; color: ${THEME.text}; }
+.sf-code-preview-btn { background: ${THEME.surface1}; color: ${THEME.teal}; border: 1px solid ${THEME.glassBorder}; }
+.sf-code-preview-btn:hover { background: ${THEME.surface2}; color: ${THEME.text}; }
 .sf-match-preview {
   margin-top: 10px; padding: 10px 12px; border-radius: 8px;
   background: ${THEME.surface0}; border: 1px solid ${THEME.glassBorder};
@@ -2524,6 +2569,28 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .sf-match-preview.bad { border-color: ${THEME.red}33; color: ${THEME.red}; }
 .sf-match-preview-title { font-weight: 800; margin-bottom: 4px; color: ${THEME.text}; }
 .sf-match-preview code { color: ${THEME.subtext1}; word-break: break-all; }
+.sf-code-preview {
+  margin-top: 10px; border-radius: 8px; overflow: hidden;
+  background: ${THEME.crust}; border: 1px solid ${THEME.glassBorder};
+}
+.sf-code-preview.hidden { display: none; }
+.sf-code-preview-header {
+  display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px;
+  color: ${THEME.subtext1}; background: ${THEME.surface0};
+  font: 700 10px/1.3 inherit; border-bottom: 1px solid ${THEME.glassBorder};
+}
+.sf-code-preview-note { color: ${THEME.yellow}; font-weight: 600; text-align: right; }
+.sf-code-preview pre {
+  max-height: 360px; margin: 0; padding: 12px; overflow: auto;
+  color: ${THEME.subtext1}; font: 500 11px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+  tab-size: 2; white-space: pre; text-align: left;
+}
+.sf-code-preview code { display: block; min-width: max-content; }
+.sf-code-token-comment { color: ${THEME.overlay}; }
+.sf-code-token-string { color: ${THEME.green}; }
+.sf-code-token-number { color: ${THEME.peach}; }
+.sf-code-token-literal { color: ${THEME.mauve}; }
+.sf-code-token-keyword { color: ${THEME.purple}; }
 .sf-install-warning {
   margin-top: 8px; color: ${THEME.yellow}; font: 700 11px/1.4 inherit;
 }
@@ -4164,6 +4231,41 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
       }
     }
 
+    async _toggleCodePreview(script, pane, button) {
+      if (!pane.classList.contains("hidden")) {
+        pane.classList.add("hidden");
+        button.setAttribute("aria-expanded", "false");
+        return;
+      }
+
+      pane.className = "sf-code-preview";
+      _safeHTML(pane, `<div class="sf-code-preview-header"><span>Source preview</span><span class="sf-code-preview-note">Loading...</span></div>`);
+      button.disabled = true;
+      button.setAttribute("aria-expanded", "true");
+
+      try {
+        if (!Object.prototype.hasOwnProperty.call(script, "_codePreviewSource")) {
+          script._codePreviewSource = await this._fetchPreviewSource(script.code_url, script);
+        }
+        const highlighted = highlightUserScript(script._codePreviewSource);
+        const note = `${highlighted.lineCount} lines${highlighted.truncated ? " · truncated at 100,000 characters" : ""}`;
+        _safeHTML(pane, `
+          <div class="sf-code-preview-header">
+            <span>Source preview</span>
+            <span class="sf-code-preview-note">${escapeHtml(note)}</span>
+          </div>
+          <pre aria-label="Syntax-highlighted userscript source"><code>${highlighted.html}</code></pre>
+        `);
+      } catch(err) {
+        _safeHTML(pane, `
+          <div class="sf-code-preview-header"><span>Source preview unavailable</span></div>
+          <div class="sf-match-preview warn">${escapeHtml(err?.message || "Could not load script source.")}</div>
+        `);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
     _fetchPreviewSource(url, script = null) {
       const validation = InstallSafety.validateInstallUrl(script || { _source: this.currentService }, url);
       if (!validation.ok) return Promise.reject(new Error(`Preview blocked: ${validation.reason}`));
@@ -4333,10 +4435,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
         actionBtn = "";
       }
       const previewBtn = safeInstallUrl ? `<button class="sf-preview-btn" data-url="${escapeHtml(safeInstallUrl)}" title="Preview match coverage">${getIcon('search')} Coverage</button>` : "";
+      const codePreviewBtn = safeInstallUrl ? `<button class="sf-code-preview-btn" data-url="${escapeHtml(safeInstallUrl)}" title="Preview source code" aria-label="Preview source code" aria-expanded="false">${getIcon('code')} Code</button>` : "";
       const queued = this._isQueued(script);
       const queueBtn = `<button class="sf-queue-btn ${queued ? 'queued' : ''}" title="${queued ? 'Remove from queue' : 'Queue to try later'}" aria-label="${queued ? 'Remove from queue' : 'Queue to try'}" aria-pressed="${queued}">${getIcon('calendarPlus')}</button>`;
       const dismissBtn = `<button class="sf-dismiss-btn" title="Hide this result" aria-label="Dismiss ${escapeHtml(script.name || 'script')}">${getIcon('x')}</button>`;
-      const actionsHtml = `<div class="sf-script-actions">${actionBtn}${previewBtn}${queueBtn}${dismissBtn}</div>`;
+      const actionsHtml = `<div class="sf-script-actions">${actionBtn}${previewBtn}${codePreviewBtn}${queueBtn}${dismissBtn}</div>`;
 
       _safeHTML(item, `
         <div class="sf-script-top">
@@ -4357,6 +4460,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
         <div class="sf-script-desc" title="${escapeHtml(script.description || '')}">${escapeHtml(script.description || "No description")}</div>
         <div class="sf-script-meta">${metaHtml}</div>
         <div class="sf-match-preview hidden"></div>
+        <div class="sf-code-preview hidden"></div>
       `);
 
       // Action button handler
@@ -4374,6 +4478,15 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
         previewEl.addEventListener("click", (e) => {
           e.stopPropagation();
           this._toggleMatchPreview(script, previewPane, previewEl);
+        });
+      }
+
+      const codePreviewEl = item.querySelector(".sf-code-preview-btn");
+      const codePreviewPane = item.querySelector(".sf-code-preview");
+      if (codePreviewEl && codePreviewPane) {
+        codePreviewEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this._toggleCodePreview(script, codePreviewPane, codePreviewEl);
         });
       }
 

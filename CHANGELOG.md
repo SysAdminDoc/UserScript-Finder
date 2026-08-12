@@ -4,6 +4,9 @@ All notable changes to UserScript-Finder will be documented in this file.
 
 ## [Next]
 
+### Added
+- Add deferred, cached source-code previews with bounded syntax highlighting for installable userscripts before installation.
+
 ### Fixed
 - Clear and replace the settings polling fallback interval so repeated injection does not retain old Script Finder instances.
 - Queue source reload requests that arrive during an active fetch so a tab change cannot start parallel single-source loads.
