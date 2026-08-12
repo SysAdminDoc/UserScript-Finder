@@ -157,6 +157,11 @@
     disclosureAckedSources: []
   };
 
+  const STORAGE_LIMITS = Object.freeze({
+    dismissedPerDomain: 500,
+    queueItems: 200
+  });
+
   const SETTINGS_WATCH_CLEANUP_KEY = "__SF_SETTINGS_WATCH_CLEANUP__";
 
   const STRINGS = {
@@ -2093,6 +2098,7 @@
       GitHubScriptService,
       CatalogScriptService,
       GitHubGistService,
+      STORAGE_LIMITS,
       reputationScore,
       normalizedRating,
       matchesLanguageFilter,
@@ -3930,16 +3936,22 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
     _getDismissed() {
       const domain = HostService.extractRootDomain(this.currentDomain || HostService.getCurrentHost());
       const all = gmGetValue("sf_dismissed", {}) || {};
-      return all[domain] || [];
+      const stored = Array.isArray(all[domain]) ? all[domain] : [];
+      if (stored.length <= STORAGE_LIMITS.dismissedPerDomain) return stored;
+      const trimmed = stored.slice(-STORAGE_LIMITS.dismissedPerDomain);
+      all[domain] = trimmed;
+      gmSetValue("sf_dismissed", all);
+      return trimmed;
     }
 
     _dismissScript(script) {
       const domain = HostService.extractRootDomain(this.currentDomain || HostService.getCurrentHost());
       const all = gmGetValue("sf_dismissed", {}) || {};
-      const list = all[domain] || [];
+      const stored = Array.isArray(all[domain]) ? all[domain] : [];
+      const list = stored.filter(key => typeof key === "string");
       const key = this._scriptKey(script);
       if (!list.includes(key)) list.push(key);
-      all[domain] = list;
+      all[domain] = list.slice(-STORAGE_LIMITS.dismissedPerDomain);
       gmSetValue("sf_dismissed", all);
     }
 
@@ -3966,7 +3978,12 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
     }
 
     _getQueue() {
-      return gmGetValue("sf_queue", []) || [];
+      const stored = gmGetValue("sf_queue", []) || [];
+      if (!Array.isArray(stored)) return [];
+      if (stored.length <= STORAGE_LIMITS.queueItems) return stored.slice();
+      const trimmed = stored.slice(-STORAGE_LIMITS.queueItems);
+      gmSetValue("sf_queue", trimmed);
+      return trimmed;
     }
 
     _isQueued(script) {
@@ -3990,7 +4007,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
         source: script._source || "",
         addedAt: new Date().toISOString()
       });
-      gmSetValue("sf_queue", queue);
+      gmSetValue("sf_queue", queue.slice(-STORAGE_LIMITS.queueItems));
       return true;
     }
 

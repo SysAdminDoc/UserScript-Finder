@@ -7,6 +7,7 @@ All notable changes to UserScript-Finder will be documented in this file.
 ### Fixed
 - Clear and replace the settings polling fallback interval so repeated injection does not retain old Script Finder instances.
 - Queue source reload requests that arrive during an active fetch so a tab change cannot start parallel single-source loads.
+- Cap dismissed-script history at 500 entries per domain and the cross-domain try queue at 200 entries, trimming existing oversized values.
 
 ## [v1.28.0] - 2026-07-01
 

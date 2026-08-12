@@ -8,10 +8,6 @@ Actionable work only. Historical and completed roadmap material is archived in C
 
 - [ ] Source-code preview with syntax highlighting before install
 
-- [ ] P3 — Cap per-domain dismissed scripts and queue storage
-  Why: `sf_dismissed` and `sf_queue` GM values grow without bound; heavy use could eventually hit manager storage limits.
-  Where: `_dismissScript`, `_toggleQueued`
-
 - [ ] P3 — OpenUserJS install URL assumes two-segment script paths
   Why: Paths like `/scripts/123` (without author segment) produce broken install URLs that pass validation but 404 on fetch.
   Where: `OpenUserJSScriptService._normalizeRow`, line ~1268
