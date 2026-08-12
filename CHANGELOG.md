@@ -2,7 +2,7 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
-## [Next]
+## [v1.29.0] - 2026-08-12
 
 ### Added
 - Add deferred, cached source-code previews with bounded syntax highlighting for installable userscripts before installation.
