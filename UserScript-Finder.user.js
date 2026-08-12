@@ -170,6 +170,8 @@
     modalTitleCatalogs: (host) => `Catalogs for ${host}`,
     modalTitleGists: (host) => `Gists for ${host}`,
     modalTitleResults: (host) => `Results for ${host}`,
+    relatedSiteTitle: "Related-site matches",
+    relatedSiteText: (hosts) => `Also searched ${hosts.join(", ")} for scripts that support this site.`,
     modalTitleCompat: "Manager compatibility",
     modalTitleDisclosure: "Network disclosure",
     emptyNoScripts: (host, label) => `Nothing matched ${host} on ${label}.`,
@@ -1035,6 +1037,15 @@
       if (value.startsWith("[") && value.endsWith("]")) return value.slice(1, -1);
       if (this.isIpAddress(value) || value === "localhost") return value;
       return value.replace(/^(www\.|m\.|mobile\.)/, "");
+    }
+
+    static relatedSearchHosts(host) {
+      const normalized = this.normalizeHost(host);
+      const related = {
+        "youtu.be": ["youtube.com"],
+        "music.youtube.com": ["youtube.com"]
+      }[normalized] || [];
+      return [...new Set([normalized, ...related].filter(Boolean))];
     }
 
     static extractRootDomain(host) {
@@ -2751,6 +2762,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
       this.filters = { updatedMonths: "any", minRating: "any", languageFilter: "any" };
       this.queryMode = this.settings.get("queryMode") || "auto";
       this.currentDomain = HostService.getCurrentHost();
+      this.relatedSearchHosts = [];
       this.isOpen = false;
       this.isLoading = false;
       this._loadQueued = false;
@@ -3440,6 +3452,14 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
           </div>
         `);
       }
+      if (this.relatedSearchHosts?.length) {
+        notices.push(`
+          <div class="sf-source-notice">
+            <div class="sf-source-notice-title">${STRINGS.relatedSiteTitle}</div>
+            <div>${escapeHtml(STRINGS.relatedSiteText(this.relatedSearchHosts))}</div>
+          </div>
+        `);
+      }
       return notices.join("");
     }
 
@@ -3692,14 +3712,15 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 
       const host = HostService.getCurrentHost();
       this.currentDomain = host;
-      const queryHost = this._resolveQueryHost(host);
+      const queryHosts = this._resolveQueryHosts(host);
+      this.relatedSearchHosts = queryHosts.slice(1);
       const enabled = this._enabledSourceNames();
       const results = [];
       const seen = new Set();
 
       const promises = enabled.map(async source => {
         try {
-          const scripts = await this.services[source].searchScriptsByHost(queryHost, this.settings);
+          const scripts = await this._searchServiceByHosts(this.services[source], queryHosts);
           const health = scripts?._sfHealth || { type: "ok", title: `${SOURCE_META[source].label} loaded`, checkedAt: Date.now() };
           this._recordSourceHealth(source, health);
           return Array.isArray(scripts) ? scripts : [];
@@ -3745,6 +3766,49 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
       }
     }
 
+    _resolveQueryHosts(host) {
+      const queryHost = this._resolveQueryHost(host);
+      return this.queryMode === "auto" ? HostService.relatedSearchHosts(queryHost) : [queryHost];
+    }
+
+    async _searchServiceByHosts(service, queryHosts) {
+      const batches = [];
+      const errors = [];
+      for (const queryHost of queryHosts) {
+        try {
+          batches.push({ host: queryHost, scripts: await service.searchScriptsByHost(queryHost, this.settings) });
+        } catch (err) {
+          errors.push({ host: queryHost, error: err });
+        }
+      }
+
+      const results = [];
+      const seen = new Set();
+      for (const batch of batches) {
+        if (!Array.isArray(batch.scripts)) continue;
+        for (const script of batch.scripts) {
+          const key = script.url || script.code_url || script._full_name || script.name;
+          if (key && !seen.has(key)) {
+            seen.add(key);
+            results.push(script);
+          }
+        }
+      }
+
+      if (!results.length && errors.length) throw errors[0].error;
+      const degraded = batches.map(batch => batch.scripts?._sfStatus).find(Boolean);
+      let merged = degraded ? SourceRuntime.withStatus(results, degraded) : results;
+      if (errors.length) {
+        merged = SourceRuntime.withStatus(merged, {
+          type: "partial",
+          title: `${SourceRuntime.label(service)} partially loaded`,
+          detail: `${errors.length} related-site search ${errors.length === 1 ? "query" : "queries"} failed; showing successful matches.`,
+          checkedAt: Date.now()
+        });
+      }
+      return merged;
+    }
+
     // ── Data ────────────────────────────────────────────────────────
     async _loadScripts() {
       this.compatibility = ManagerCompatibility.report();
@@ -3782,8 +3846,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
       try {
         const host = HostService.getCurrentHost();
         this.currentDomain = host;
-        const queryHost = this._resolveQueryHost(host);
-        const scripts = await svc.searchScriptsByHost(queryHost, this.settings);
+        const queryHosts = this._resolveQueryHosts(host);
+        this.relatedSearchHosts = queryHosts.slice(1);
+        const scripts = await this._searchServiceByHosts(svc, queryHosts);
         const activeHostBlock = this._currentHostBlock();
         if (activeHostBlock) {
           this._showHostBlocked(activeHostBlock);
