@@ -8,6 +8,8 @@ All notable changes to UserScript-Finder will be documented in this file.
 - Clear and replace the settings polling fallback interval so repeated injection does not retain old Script Finder instances.
 - Queue source reload requests that arrive during an active fetch so a tab change cannot start parallel single-source loads.
 - Cap dismissed-script history at 500 entries per domain and the cross-domain try queue at 200 entries, trimming existing oversized values.
+- Treat OpenUserJS script paths without both author and script segments as view-only instead of generating invalid install URLs.
+- Deduplicate GitHub Gist results using case-insensitive owner/hash keys across snippets and search queries.
 
 ## [v1.28.0] - 2026-07-01
 

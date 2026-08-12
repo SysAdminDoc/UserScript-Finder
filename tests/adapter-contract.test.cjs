@@ -52,6 +52,8 @@ function assertShape(item, source) {
 
     const openuserjs = new hooks.OpenUserJSScriptService()
       ._parseSearchResults(fixtures.openuserjs)[0];
+    const openuserjsInvalid = new hooks.OpenUserJSScriptService()
+      ._parseSearchResults(`<table><tbody><tr class="tr-link"><td><a href="/scripts/123">Legacy OpenUserJS</a></td></tr></tbody></table>`)[0];
 
     const chrome = new hooks.ChromeWebStoreService()
       ._parseSearchResults(fixtures.chrome)[0];
@@ -71,8 +73,11 @@ function assertShape(item, source) {
       ...catalogService._parseAwesomeUserscripts(fixtures.awesome, "reddit.com")
     ];
 
-    const gist = new hooks.GitHubGistService()
-      ._parseSearchResults(fixtures.gist)[0];
+    const gistService = new hooks.GitHubGistService();
+    const gist = gistService._parseSearchResults(fixtures.gist)[0];
+    const mixedCaseGists = gistService._parseSearchResults(
+      fixtures.gist + fixtures.gist.replace("0123456789abcdef0123456789abcdef", "0123456789ABCDEF0123456789ABCDEF")
+    );
 
     const helperChecks = {
       normalizedRating: hooks.normalizedRating({ fan_score: 8 }),
@@ -91,7 +96,7 @@ function assertShape(item, source) {
       }, Date.parse("2026-06-29T00:00:00Z"))
     };
 
-    return { greasy, openuserjs, chrome, mozilla, github, catalogs, gist, helperChecks };
+    return { greasy, openuserjs, openuserjsInvalid, chrome, mozilla, github, catalogs, gist, mixedCaseGists, helperChecks };
   }, {
     greasyfork: fixture("greasyfork-by-site.json"),
     openuserjs: fixture("openuserjs-search.html"),
@@ -107,6 +112,7 @@ function assertShape(item, source) {
   assert.equal(result.greasy.name, "Greasy Reddit Helper");
   assertShape(result.openuserjs, "openuserjs");
   assert.equal(result.openuserjs.code_url, "https://openuserjs.org/install/alice/OUJS_Reddit_Helper.user.js");
+  assert.equal(result.openuserjsInvalid.code_url, null, "OpenUserJS paths without author and script segments are view-only");
   assertShape(result.chrome, "chromewebstore");
   assert.equal(result.chrome.name, "Chrome Reddit Helper");
   assert.deepEqual(result.chrome._permissions, ["storage", "tabs"]);
@@ -125,6 +131,7 @@ function assertShape(item, source) {
   result.catalogs.forEach(item => assertShape(item, "catalogs"));
   assertShape(result.gist, "githubgist");
   assert.match(result.gist.code_url, /^https:\/\/gist\.githubusercontent\.com\/alice\//);
+  assert.equal(result.mixedCaseGists.length, 1, "Gist hashes deduplicate without case sensitivity");
   assert.equal(result.helperChecks.normalizedRating, 4);
   assert.equal(result.helperChecks.english, true);
   assert.equal(result.helperChecks.nonEnglish, false);

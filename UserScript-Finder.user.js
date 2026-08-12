@@ -1307,15 +1307,16 @@
       const versionEl = infoCell.querySelector(".script-version");
       const descEl = infoCell.querySelector("p");
       const updatedEl = row.querySelector("time[datetime]");
-      const authorFromPath = this._decodePathSegment(pagePath.split("/")[2]);
-      const installPath = pagePath.replace(/^\/scripts\//, "/install/") + ".user.js";
+      const pathMatch = pagePath.match(/^\/scripts\/([^\/?#]+)\/([^\/?#]+)\/?$/);
+      const authorFromPath = this._decodePathSegment(pathMatch?.[1]);
+      const installPath = pathMatch ? `/install/${pathMatch[1]}/${pathMatch[2]}.user.js` : null;
 
       return {
         _source: "openuserjs",
         name: cleanText(link.textContent) || "Untitled",
         description: cleanText(descEl?.textContent) || "",
         url: this.baseUrl + pagePath,
-        code_url: this.baseUrl + installPath,
+        code_url: installPath ? this.baseUrl + installPath : null,
         version: cleanText(versionEl?.textContent) || null,
         license: null,
         users: [{ name: cleanText(authorLink?.textContent) || authorFromPath || null }],
@@ -1947,8 +1948,8 @@
         try {
           const html = await this._fetchSearch(query);
           for (const script of this._parseSearchResults(html)) {
-            const key = script._full_name;
-            if (!seen.has(key)) {
+            const key = this._dedupeKey(script);
+            if (key && !seen.has(key)) {
               seen.add(key);
               results.push(script);
             }
@@ -1991,10 +1992,15 @@
       const seen = new Set();
 
       return snippets.map(snippet => this._normalizeSnippet(snippet)).filter(script => {
-        if (!script || seen.has(script._full_name)) return false;
-        seen.add(script._full_name);
+        const key = this._dedupeKey(script);
+        if (!script || !key || seen.has(key)) return false;
+        seen.add(key);
         return true;
       }).slice(0, 100);
+    }
+
+    _dedupeKey(script) {
+      return String(script?._full_name || "").toLowerCase();
     }
 
     _normalizeSnippet(snippet) {
