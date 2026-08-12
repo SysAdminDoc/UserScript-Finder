@@ -202,7 +202,7 @@ npm install
 npm test
 ```
 
-Runs 14 tests covering adapter contracts, install safety, match coverage, host normalization, accessibility markup, diagnostics markup, source privacy, sensitive host protection, network disclosure, manager compatibility, root fallback coverage, source runtime, modal layout at desktop/mobile widths, and `@connect` allowlist consistency.
+Runs 16 tests covering adapter contracts, install safety, match coverage, host normalization, accessibility markup, diagnostics markup, source privacy, sensitive host protection, network disclosure, manager compatibility, root fallback coverage, source runtime, modal layout at desktop/mobile widths, settings polling cleanup, load concurrency, and `@connect` allowlist consistency.
 
 ## Contributing
 

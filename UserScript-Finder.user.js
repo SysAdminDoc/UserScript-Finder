@@ -157,6 +157,8 @@
     disclosureAckedSources: []
   };
 
+  const SETTINGS_WATCH_CLEANUP_KEY = "__SF_SETTINGS_WATCH_CLEANUP__";
+
   const STRINGS = {
     modalTitleScripts: (host) => `Scripts for ${host}`,
     modalTitleExtensions: (host) => `Extensions for ${host}`,
@@ -908,7 +910,10 @@
 
   // ── Settings Service ────────────────────────────────────────────────
   class SettingsService {
-    constructor() { this.settings = this.loadSettings(); }
+    constructor() {
+      this._pollTimer = null;
+      this.settings = this.loadSettings();
+    }
     loadSettings() {
       const saved = gmGetValue("sf_settings_v4", {}) || {};
       const settings = { ...DEFAULT_SETTINGS, ...saved };
@@ -944,7 +949,32 @@
     get(key) { return this.settings[key]; }
     set(key, value) { this.settings[key] = value; this.saveSettings(); }
 
+    stopWatching() {
+      if (this._pollTimer !== null) {
+        clearInterval(this._pollTimer);
+        this._pollTimer = null;
+      }
+    }
+
     watchForChanges(callback) {
+      const previousCleanup = globalThis?.[SETTINGS_WATCH_CLEANUP_KEY];
+      if (typeof previousCleanup === "function") {
+        try { previousCleanup(); } catch {}
+      }
+      this.stopWatching();
+
+      let cleanupActive = true;
+      const cleanup = () => {
+        if (!cleanupActive) return;
+        cleanupActive = false;
+        this.stopWatching();
+        if (globalThis?.[SETTINGS_WATCH_CLEANUP_KEY] === cleanup) {
+          try { delete globalThis[SETTINGS_WATCH_CLEANUP_KEY]; }
+          catch { globalThis[SETTINGS_WATCH_CLEANUP_KEY] = null; }
+        }
+      };
+      globalThis[SETTINGS_WATCH_CLEANUP_KEY] = cleanup;
+
       const listener = gmFunction("GM_addValueChangeListener");
       if (listener) {
         try {
@@ -954,11 +984,11 @@
             this.settings.sources = this.normalizeSources(newVal.sources);
             callback();
           });
-          return;
+          return cleanup;
         } catch {}
       }
       let lastJson = JSON.stringify(this.settings);
-      setInterval(() => {
+      this._pollTimer = setInterval(() => {
         const saved = gmGetValue("sf_settings_v4", {}) || {};
         const json = JSON.stringify(saved);
         if (json !== lastJson) {
@@ -968,7 +998,12 @@
           callback();
         }
       }, 3000);
+      return cleanup;
     }
+  }
+
+  if (typeof window !== "undefined" && window.__SF_TEST_HOOKS__) {
+    window.__SF_TEST_HOOKS__.SettingsService = SettingsService;
   }
 
   // ── Host Service ────────────────────────────────────────────────────
@@ -2706,6 +2741,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
       this.currentDomain = HostService.getCurrentHost();
       this.isOpen = false;
       this.isLoading = false;
+      this._loadQueued = false;
       this.allScripts = [];
       this.sourceStatus = null;
       this.sourceHealth = {};
@@ -3709,8 +3745,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
         this._showHostBlocked(hostBlock);
         return;
       }
+      if (this.isLoading) {
+        this._loadQueued = true;
+        return;
+      }
       if (this.currentService === "_all") return this._loadAllSources();
-      if (this.isLoading) return;
       this._ensureCurrentSource();
       if (!this._isSourceEnabled(this.currentService)) {
         this.allScripts = [];
@@ -3775,7 +3814,9 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
       } finally {
         this.isLoading = false;
         this.content.setAttribute("aria-busy", "false");
-        if (this.isOpen && activeService !== this.currentService && this._isSourceEnabled(this.currentService)) this._loadScripts();
+        const shouldReload = this._loadQueued || activeService !== this.currentService;
+        this._loadQueued = false;
+        if (this.isOpen && shouldReload && this._isSourceEnabled(this.currentService)) this._loadScripts();
       }
     }
 
@@ -4281,6 +4322,10 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 
       return item;
     }
+  }
+
+  if (typeof window !== "undefined" && window.__SF_TEST_HOOKS__) {
+    window.__SF_TEST_HOOKS__.ScriptFinder = ScriptFinder;
   }
 
   // ── Init ────────────────────────────────────────────────────────────

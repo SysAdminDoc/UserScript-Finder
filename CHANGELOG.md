@@ -2,6 +2,12 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
+## [Next]
+
+### Fixed
+- Clear and replace the settings polling fallback interval so repeated injection does not retain old Script Finder instances.
+- Queue source reload requests that arrive during an active fetch so a tab change cannot start parallel single-source loads.
+
 ## [v1.28.0] - 2026-07-01
 
 ### Fixed
