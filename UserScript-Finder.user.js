@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.29.0
-// @description  Finds userscripts and extension alternatives for the current domain
+// @version      1.29.1
+// @description  Search eight userscript and extension sources for the site you're viewing
 // @author       SysAdminDoc
 // @match        *://*/*
 // @grant        GM_xmlhttpRequest
@@ -184,7 +184,7 @@
     loadingSearch: (label) => `Searching ${label}...`,
     loadingAllSources: "Searching all sources...",
     toastDiagCopied: "Diagnostics copied",
-    toastDiagConsole: "Copy failed — select and copy manually",
+    toastDiagConsole: "Copy failed. Select and copy manually.",
     toastDiagManual: "Copy diagnostics manually",
     toastSettingsExported: "Settings exported",
     toastSettingsImported: "Settings imported",
@@ -2257,7 +2257,6 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
   background: ${THEME.surface1}; color: ${THEME.text};
   padding: 12px 20px; border-radius: 12px; font: 600 13px/1.4 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;
   box-shadow: 0 12px 40px ${THEME.shadow}; border: 1px solid ${THEME.glassBorder};
-  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   opacity: 0; transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1);
   z-index: 2147483647; pointer-events: auto; display: flex; align-items: center; gap: 12px;
   max-width: 440px; width: max-content;
@@ -2274,7 +2273,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .sf-modal {
   position: fixed; bottom: 14px; right: 14px; width: min(500px, calc(100vw - 24px));
   max-height: min(84vh, 800px);
-  background: ${THEME.base}; border-radius: 16px;
+  background: ${THEME.base}; border-radius: 12px;
   border: 1px solid ${THEME.glassBorder};
   box-shadow: 0 32px 80px ${THEME.shadow}, 0 0 0 1px rgba(255,255,255,0.02);
   overflow: hidden; display: flex; flex-direction: column;
@@ -2475,7 +2474,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 }
 .sf-content::-webkit-scrollbar { width: 6px; }
 .sf-content::-webkit-scrollbar-track { background: transparent; }
-.sf-content::-webkit-scrollbar-thumb { background: ${THEME.surface2}; border-radius: 3px; }
+.sf-content::-webkit-scrollbar-thumb { background: ${THEME.surface2}; border-radius: 4px; }
 .sf-content::-webkit-scrollbar-thumb:hover { background: ${THEME.overlay0}; }
 
 /* Script items */
@@ -2639,7 +2638,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 /* Loading / empty / error */
 .sf-loading { padding: 50px 20px; text-align: center; display: grid; gap: 14px; place-items: center; }
 .sf-spinner {
-  width: 36px; height: 36px; border-radius: 50%;
+  width: 36px; height: 36px; border-radius: 12px;
   border: 3px solid ${THEME.surface2}; border-top-color: ${THEME.green};
   animation: sfSpin 0.7s linear infinite;
 }
@@ -2732,7 +2731,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .sf-health-pill.rate-limited, .sf-health-pill.failed { color: ${THEME.red}; border-color: ${THEME.red}33; }
 .sf-diagnostics-btn {
   border: 1px solid ${THEME.glassBorder}; background: ${THEME.surface1}; color: ${THEME.subtext1};
-  border-radius: 7px; padding: 5px 9px; font: 800 10px/1 inherit; cursor: pointer; flex-shrink: 0;
+  border-radius: 6px; padding: 5px 9px; font: 800 10px/1 inherit; cursor: pointer; flex-shrink: 0;
 }
 .sf-diagnostics-btn:hover { color: ${THEME.text}; background: ${THEME.surface2}; }
 
@@ -2746,7 +2745,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 }
 .sf-settings::-webkit-scrollbar { width: 6px; }
 .sf-settings::-webkit-scrollbar-track { background: transparent; }
-.sf-settings::-webkit-scrollbar-thumb { background: ${THEME.surface2}; border-radius: 3px; }
+.sf-settings::-webkit-scrollbar-thumb { background: ${THEME.surface2}; border-radius: 4px; }
 .sf-settings-title { font: 700 13px/1 inherit; color: ${THEME.text}; margin-bottom: 12px; }
 .sf-settings-subtitle {
   font: 800 10px/1 inherit; color: ${THEME.overlay}; text-transform: uppercase;
@@ -2764,14 +2763,14 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 .sf-setting-label { font: 500 12px/1.3 inherit; color: ${THEME.subtext1}; }
 .sf-setting-help { color: ${THEME.overlay}; font: 500 11px/1.35 inherit; }
 .sf-setting-textarea {
-  min-height: 64px; resize: vertical; padding: 8px 9px; border-radius: 7px;
+  min-height: 64px; resize: vertical; padding: 8px 9px; border-radius: 6px;
   border: 1px solid ${THEME.glassBorder}; background: ${THEME.surface0};
   color: ${THEME.text}; font: 500 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
   outline: none;
 }
 .sf-setting-mini-btn {
   border: 1px solid ${THEME.glassBorder}; background: ${THEME.surface1};
-  color: ${THEME.subtext1}; border-radius: 7px; padding: 6px 10px;
+  color: ${THEME.subtext1}; border-radius: 6px; padding: 6px 10px;
   font: 800 10px/1 inherit; cursor: pointer;
 }
 .sf-setting-mini-btn:hover { color: ${THEME.text}; background: ${THEME.surface2}; }
@@ -2783,7 +2782,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
 }
 .sf-toggle::after {
   content: ''; position: absolute; top: 2px; left: 2px;
-  width: 16px; height: 16px; border-radius: 50%;
+  width: 16px; height: 16px; border-radius: 6px;
   background: ${THEME.subtext0}; transition: all 0.2s ease;
 }
 .sf-toggle.on { background: ${THEME.green}55; }

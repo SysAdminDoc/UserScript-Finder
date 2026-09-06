@@ -1,225 +1,141 @@
 <p align="center">
-  <img src="img/icon.png" alt="UserScript Finder" width="128" height="128">
+  <img src="assets/brand/userscript-finder-mark.png" width="128" height="128" alt="UserScript Finder magnifier and script mark">
 </p>
 
 <h1 align="center">UserScript Finder</h1>
 
+<p align="center"><strong>Find the right browser script without leaving the site.</strong></p>
+
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.29.0-blue" alt="Version">
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/Tampermonkey-Compatible-00485B?logo=tampermonkey&logoColor=white" alt="Tampermonkey">
-  <img src="https://img.shields.io/badge/Violentmonkey-Compatible-a55000" alt="Violentmonkey">
+  <img src="https://img.shields.io/badge/version-v1.29.1-20C9F5?style=for-the-badge" alt="Version 1.29.1">
+  <img src="https://img.shields.io/badge/license-MIT-52E39A?style=for-the-badge" alt="MIT license">
+  <img src="https://img.shields.io/badge/userscript-Tampermonkey_%7C_Violentmonkey-8B96B8?style=for-the-badge" alt="Tampermonkey and Violentmonkey">
 </p>
 
 <p align="center">
-  Discover userscripts and extension alternatives for any website — searches GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, curated catalogs, GitHub Gists, and GitHub from one place.
+  <a href="https://raw.githubusercontent.com/SysAdminDoc/UserScript-Finder/main/UserScript-Finder.user.js"><strong>Install UserScript Finder</strong></a>
+  · <a href="#see-it-in-action">Screenshots</a>
+  · <a href="#what-it-searches">Sources</a>
+  · <a href="#safety-before-installation">Safety</a>
 </p>
 
----
+UserScript Finder adds a compact search panel to your userscript manager. Open it on any website to compare domain-matched userscripts, browser extensions, curated catalogs, Gists, and GitHub repositories from one place.
 
-## Installation
+No search request is sent until you open the finder. On first use, it shows every external host that each enabled source will contact and lets you disable sources before continuing.
 
-1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/)
-2. **[Click here to install UserScript Finder](https://raw.githubusercontent.com/SysAdminDoc/UserScript-Finder/main/UserScript-Finder.user.js)**
-3. Confirm installation when prompted
+<p align="center">
+  <img src="assets/marketing/social-preview.png" width="1000" alt="UserScript Finder product card showing the source search panel">
+</p>
 
-## How It Works
+## Install
 
-Click your userscript manager icon on any website and pick a source to search:
+1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/).
+2. Open the [UserScript Finder installer](https://raw.githubusercontent.com/SysAdminDoc/UserScript-Finder/main/UserScript-Finder.user.js) and approve it in your userscript manager.
+3. Visit a website, open the manager menu, and choose a `Find Scripts` or `Find Extensions` command.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Tampermonkey / Violentmonkey Menu                      │
-│                                                         │
-│  ⚙ Find Scripts for reddit.com (GreasyFork)             │
-│  ⚙ Find Scripts for reddit.com (SleazyFork)             │
-│  ⚙ Find Scripts for reddit.com (OpenUserJS)             │
-│  ⚙ Find Extensions for reddit.com (Chrome Web Store)    │
-│  ⚙ Find Extensions for reddit.com (Mozilla AMO)          │
-│  ⚙ Find Catalogs for reddit.com (Awesome/Tampermonkey)   │
-│  ⚙ Find Scripts for reddit.com (GitHub Gists)            │
-│  ⚙ Find Scripts for reddit.com (GitHub)                 │
-│  ⚙ Reset Script Finder Settings                         │
-└─────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────┐
-│  Scripts for reddit.com                                 │
-│  47 scripts found                                       │
-│                                                         │
-│  [GreasyFork] [SleazyFork] [OpenUserJS]                  │
-│  [Chrome]    [Firefox]    [Catalogs]                     │
-│  [Gists]     [GitHub]                                    │
-│                                                         │
-│  🔍 Filter scripts...                                   │
-│  Sort by: Daily installs ▾                              │
-│                                                         │
-│  ┌─ Reddit Enhancement Suite ──────────── [Install] ──┐ │
-│  │  Author: honestbleeps  · v5.24.6  · MIT            │ │
-│  │  A suite of modules that enhance your browsing...   │ │
-│  │  📥 2.1k/day  📊 1.2M  ⭐ 892  🔥 9.2  🔄 3d ago   │ │
-│  └────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
+The finder has no permanent page button. It stays out of the way until you choose a menu command.
 
-**Zero visual footprint.** Nothing appears on the page until you open it from the menu.
+## See it in action
 
-## Features
+<table>
+  <tr>
+    <td width="50%"><img src="assets/screenshots/search-results.png" alt="UserScript Finder showing domain-matched GreasyFork results"></td>
+    <td width="50%"><img src="assets/screenshots/source-preview.png" alt="UserScript Finder showing a syntax-highlighted userscript source preview"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Compare installs, ratings, freshness, and author details.</sub></td>
+    <td align="center"><sub>Read bounded, highlighted source before the install handoff.</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="assets/screenshots/network-disclosure.png" alt="UserScript Finder listing every source and external host before the first search"></td>
+    <td width="50%"><img src="assets/screenshots/source-controls.png" alt="UserScript Finder settings for sources, cache, and sensitive host protection"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Review network destinations before the first request.</sub></td>
+    <td align="center"><sub>Keep searches local to the sources and hosts you allow.</sub></td>
+  </tr>
+</table>
 
-| Feature | Description |
-|---------|-------------|
-| **Eight Sources + All** | Search GreasyFork, SleazyFork, OpenUserJS, Chrome Web Store, Mozilla AMO, curated catalogs, GitHub Gists, and GitHub from a single interface — or query all enabled sources at once with deduplicated results |
-| **One-Click Install** | Install scripts directly from registries and `.user.js` Gists without leaving the page |
-| **Source Preview** | View fetched installable `.user.js` source with bounded syntax highlighting before installing |
-| **Install Safety** | Validates install origins, `.user.js` metadata, and dangerous `@grant` requests before opening a userscript-manager install handoff; unsafe candidates become View actions with inline warnings |
-| **Stale Script Warning** | Flags userscript, GitHub, and Gist results with a red "Stale" badge when last updated more than 2 years ago |
-| **Live Search Filter** | Real-time filtering within results with match count (e.g., `12/47`) |
-| **Result Filters** | Narrow results by recent update window, normalized minimum rating, and language (Any, Browser, or English) |
-| **Fielded Search** | Search with `author:`, `license:`, `source:`, `name:`, or `url:` prefixes that combine with plain text and filter controls |
-| **Source Resilience** | Adds per-source timeouts, rate-limit/backoff classification, stale-cache fallback, degraded-result notices, retry controls, and manual-search escape hatches |
-| **Source Health Diagnostics** | Shows per-source OK/cache/stale/partial/rate-limit/failure badges, footer health age, and copyable diagnostics limited to source, host, status, timestamps, cache age, and count |
-| **Source Privacy Controls** | Lets users disable individual sources so those sources disappear from menus/tabs and make no network requests until re-enabled |
-| **Sensitive Host Protection** | Blocks source menus and network searches on built-in sensitive hosts such as banks, government, identity, admin, localhost, and local-network pages, with per-host override controls |
-| **Match Coverage Preview** | Fetches raw userscript metadata and compares `@match` / `@include` / `@exclude` rules against the current page, including scheme, host, path, wildcard, and exclude precedence |
-| **Root Fallback Coverage Labels** | When GreasyFork/SleazyFork fall back from exact host to root domain, installable results are labeled Exact host, Broad/root match, or Coverage uncertain from raw metadata |
-| **Extension Trust Badges** | Chrome Web Store and Mozilla AMO results show permission counts, host-access warnings, privacy policy signals, data-collection flags, promoted status, and stale-update warnings when metadata exposes them |
-| **Smart Sorting** | Sort by daily installs, total installs, ratings, fan score, author reputation, last update, or creation date |
-| **Curated Catalogs** | Searches Awesome Userscripts and Tampermonkey's Userscript.Zone handoff for domain-matched recommendations |
-| **GitHub Integration** | Searches repos and Gists matching `{domain} userscript/tampermonkey/greasemonkey`, shows stars and forks |
-| **Dense Mode** | Toggle compact view — hides descriptions and tightens padding for fast scanning |
-| **Relative Timestamps** | Shows `3d ago`, `2mo ago`, `just now` instead of raw ISO dates |
-| **Inline Settings** | Gear icon opens settings within the modal — no external menus to navigate |
-| **Accessible Modal** | Uses dialog semantics, live result announcements, accessible control names, focus entry/restoration, and contained Tab navigation |
-| **First-Run Network Disclosure** | On first use (or when new sources are enabled), shows which external hosts each source will contact and lets users disable sources before any fetch starts |
-| **Manager Compatibility Checks** | Detects missing GM menu, network, storage, tab, and Trusted Types capabilities at runtime and shows an actionable degraded-mode report instead of failing silently |
-| **Cross-Tab Settings Sync** | Settings changes propagate to other open tabs via `GM_addValueChangeListener` with polling fallback |
-| **Dismissed Scripts** | Dismiss results you don't want with per-domain persistence and a "Show all" restore button |
-| **Queue to Try** | Bookmark scripts to try later across any domain with a persistent queue stored in userscript manager storage |
-| **Persistent Preferences** | Remembers your last-used source, sort order, dense mode, and cache duration |
-| **Search Mode** | Switch between Auto (domain), Exact host, Root domain, or Keyword search modes per your needs |
-| **Domain-Aware** | Automatically detects the current site and strips `www.`/`m.`/`mobile.` prefixes |
-| **Public-Suffix Aware Matching** | Normalizes common multi-label and hosted suffixes such as `co.uk`, `com.au`, `github.io`, `pages.dev`, and `netlify.app` before root-domain fallback |
-| **Shadow DOM** | Fully encapsulated — styles never leak into or out of the host page |
-| **TrustedTypes Safe** | Compatible with strict CSP pages (Google, YouTube, etc.) |
+Screenshots are rendered by the production userscript with deterministic sample results. The same capture script is included in this repository.
 
-## Data Sources
+## What it searches
 
-| Source | API | What's Searched | Badges Shown |
-|--------|-----|-----------------|--------------|
-| **GreasyFork** | `/scripts/by-site/{domain}.json` with search fallback | Scripts tagged for the current domain | Daily installs, total installs, ratings, fan score |
-| **SleazyFork** | Same API, different host | Adult-content scripts for the current domain | Same as GreasyFork |
-| **OpenUserJS** | `/?q={domain}` HTML search | OpenUserJS scripts matching the current domain | Installs, ratings, last update |
-| **Chrome Web Store** | `/search/{domain}` embedded result data | Chrome extensions matching the current domain | Users, rating, rating count, last update, permissions, host access, privacy/data flags |
-| **Mozilla AMO** | `/api/v5/addons/search/` | Firefox extensions matching the current domain | Users, rating, rating count, last update, permissions, host access, privacy/data flags, promoted status |
-| **Catalogs** | Awesome Userscripts README + Tampermonkey `scripts.php` | Curated userscripts and Userscript.Zone handoff for the current domain | Catalog source, category |
-| **GitHub Gists** | `gist.github.com/search` HTML search | Gists matching `{domain} userscript` | Files, stars, forks, last active |
-| **GitHub** | `api.github.com/search/repositories` | Repos matching `{domain} userscript` | Stars, forks, language |
+| Source | Finds | Useful signals |
+|---|---|---|
+| **GreasyFork** | Domain-matched userscripts | Daily installs, total installs, ratings, update age |
+| **SleazyFork** | Domain-matched userscripts | The same registry signals, in a separately controlled source |
+| **OpenUserJS** | Userscripts from site search | Installs, ratings, update age |
+| **Chrome Web Store** | Chrome extension alternatives | Users, rating, permissions, host access, privacy metadata |
+| **Mozilla AMO** | Firefox extension alternatives | Users, rating, permissions, data flags, promoted status |
+| **Catalogs** | Awesome Userscripts and Userscript.Zone results | Catalog and category context |
+| **GitHub Gists** | Installable or view-only userscript Gists | Files, stars, forks, last activity |
+| **GitHub** | Related userscript repositories | Stars, forks, language |
 
-> **Note:** GitHub's unauthenticated API is rate-limited to ~10 requests/minute. Results are cached per your cache duration setting. If you hit the limit, wait a minute and try again.
+Choose one source from the userscript manager menu, then switch tabs or use **All** to compare enabled sources together. All-source results are deduplicated by URL.
 
-## Settings
+## Safety before installation
 
-Access via the ⚙ gear icon in the modal header:
+- **Inspect the network plan.** First-run disclosure lists source hosts before fetching anything.
+- **Check page coverage.** The finder reads `@match`, `@include`, and `@exclude` metadata against the current URL.
+- Install URLs must use an approved host and include a valid userscript metadata block. Unsafe candidates become view-only results with a clear reason.
+- Open a bounded source preview in the panel. Syntax highlighting is applied only after the source is safely escaped.
+- Sensitive host protection blocks menus and searches on common banking, government, identity, administrator, localhost, and private-network hosts. Per-host overrides remain available.
 
-| Setting | Options | Default |
-|---------|---------|---------|
-| Dense Mode | On / Off | Off |
-| Default Sort | Daily installs, Total installs, Ratings, Fan score, Author reputation, Last update, Created | Daily installs |
-| Cache Duration | 1, 5, 10, 30 minutes | 5 minutes |
-| Sources | Per-source On / Off toggles | All sources on |
-| Sensitive Host Protection | On / Off plus extra blocked host patterns and per-host override | On |
-| Export / Import | Download settings as JSON or import from a file | — |
+UserScript Finder does not install code itself. A validated candidate is handed to your userscript manager, where you review and approve the final installation.
 
-## Theme
+## Search and compare
 
-Dark OLED-only interface using the **Catppuccin Mocha** palette with glassmorphism effects. Each source has its own accent color:
+| Control | Options |
+|---|---|
+| Search mode | Automatic domain, exact host, root domain, or keyword |
+| Sort | Daily installs, total installs, ratings, fan score, author reputation, updated, or created |
+| Filters | Update window, normalized minimum rating, browser language, or English |
+| Field search | `author:`, `license:`, `source:`, `name:`, and `url:` |
+| Result actions | Install, check coverage, preview code, queue for later, or dismiss |
 
-| Source | Accent |
-|--------|--------|
-| GreasyFork | Green / Teal |
-| SleazyFork | Purple / Mauve |
-| OpenUserJS | Blue |
-| Chrome Web Store | Yellow |
-| Mozilla AMO | Orange |
-| Catalogs | Cyan |
-| GitHub Gists | Flamingo |
-| GitHub | Orange / Peach |
+Source health labels distinguish fresh results from cache, stale fallback, partial responses, rate limits, and failures. Diagnostics contain source status and timing without exporting browsing history or fetched source.
 
-## Color-Coded Fan Scores
+## Privacy and storage
 
-| Score | Color | Meaning |
-|-------|-------|---------|
-| 8.0+ | Green | Highly rated |
-| 6.0–7.9 | Yellow | Average |
-| Below 6.0 | Red | Low rated |
+Settings, dismissed results, and the try-later queue stay in your userscript manager storage. There is no UserScript Finder account and no hosted project server.
+
+Each source can be disabled independently. A disabled source disappears from menus and tabs, and the finder makes no requests to its hosts. Settings changes also sync across open tabs when the manager supports value-change listeners.
+
+The complete network allowlist is visible in the userscript header and checked against the source adapter registry by the test suite.
 
 ## Compatibility
 
-| Userscript Manager | Status |
-|--------------------|--------|
-| Tampermonkey | Supported; runtime checks validate menu, network, storage, tab-open, and Trusted Types behavior |
-| Violentmonkey | Supported; runtime checks validate the same GM API surface |
-| Greasemonkey / partial managers | Degraded; if required `GM_registerMenuCommand` or `GM_xmlhttpRequest` is missing, Script Finder shows a compatibility report instead of running source fetches |
+| Manager | Support |
+|---|---|
+| Tampermonkey | Full menu, request, storage, tab, and source-preview support |
+| Violentmonkey | Full support through the same GM API surface |
+| Greasemonkey or partial managers | A compatibility report explains unavailable capabilities instead of failing silently |
 
-Works on all websites (`*://*/*`). Runs at `document-idle` with zero overhead until activated — the UI is built lazily on first menu click.
+The script runs at `document-idle` and uses Shadow DOM to isolate its panel from the website. Trusted Types handling covers strict CSP pages.
 
-If non-critical APIs such as storage, tab opening, menu unregistering, or Trusted Types policy creation are unavailable, the modal shows a degraded-mode notice and diagnostics include the exact missing capability.
+## Troubleshooting
 
-## Related Tools
+**The menu is missing:** confirm that the userscript is enabled, refresh the page, and open the userscript manager menu again. The script does not add a floating page button.
 
-> **UserScript Finder** is context-aware — it detects which site you're on and finds scripts made specifically for that domain. No separate window needed.
->
-> If you want a standalone search engine to browse scripts by keyword across all repositories (with ratings, installs, and cross-source deduplication), use the companion web app instead:
+**A source is rate limited:** switch to another tab or use cached results, then retry when the source health label permits it.
 
-**[ScriptHunt](https://github.com/SysAdminDoc/UserScriptHunt)** — A single-file HTML web app (also hosted on GitHub Pages) that searches Greasy Fork, Sleazy Fork, GitHub, and OpenUserJS in parallel with a full results grid. No Tampermonkey required. Also useful for browsing when you're not in a browser with Tampermonkey installed.
+**Results are too broad:** switch from automatic mode to exact host, then use the update and rating filters.
 
-| Tool | Use When |
-|------|----------|
-| **UserScript Finder** (this repo) | You're on a website and want scripts for that specific site, without leaving the page |
-| **ScriptHunt** | You want to search any keyword, compare installs/ratings, or browse without Tampermonkey |
+**The current site is blocked:** sensitive host protection explains the matched pattern. Add a deliberate host override only when you trust the page and its network context.
 
-## FAQ
-
-**Q: Why don't I see an icon or button on the page?**
-A: By design. UserScript Finder is menu-only — click your userscript manager icon in the browser toolbar to access it.
-
-**Q: GitHub results seem unrelated?**
-A: GitHub search finds any repository mentioning the domain alongside userscript-related keywords. Results are sorted by stars to surface the most relevant ones first.
-
-**Q: I'm getting "GitHub rate limit" errors.**
-A: The unauthenticated GitHub API allows ~10 searches per minute. Wait a moment and try again. Results are cached so repeat searches for the same domain won't hit the API.
-
-**Q: Can I change the dark theme?**
-A: The dark OLED theme is baked in — no light mode. This is intentional.
-
-## License
-
-[MIT](LICENSE) — permissive open-source license.
-
-## Verification
+## Development
 
 ```bash
 npm install
 npm test
+node --check UserScript-Finder.user.js
+npm run capture:marketing
 ```
 
-Runs 19 tests covering adapter contracts, install safety, match coverage, host normalization, accessibility markup, diagnostics markup, source privacy, sensitive host protection, network disclosure, manager compatibility, root fallback coverage, source runtime, source previews, modal layout at desktop/mobile widths, settings polling cleanup, load concurrency, storage limits, related-site discovery, and `@connect` allowlist consistency.
+`npm test` runs 19 serial tests covering adapters, install safety, matching, host privacy, disclosure, accessibility, source previews, storage limits, and desktop or mobile layout behavior.
 
-## Contributing
+To add a source, implement its adapter, register it in `SOURCE_META`, declare its hosts in `SOURCE_CONNECT` and the `@connect` header, then add a fixture-backed contract test. The allowlist audit rejects undocumented or orphaned hosts.
 
-Issues and PRs welcome. [Open an issue](https://github.com/SysAdminDoc/UserScript-Finder/issues) for bugs or feature requests.
+## License
 
-### Adding a Source Adapter
-
-Each source is a class with `searchScriptsByHost(host, settings)` returning an array of normalized script objects. To add a new source:
-
-1. **Create the adapter class** — implement `searchScriptsByHost()`, `getDirectSearchUrl()`, and a cache via `SourceRuntime`
-2. **Register in SOURCE_META** — add label, tab name, menu kind, footer URL, and unit type
-3. **Add SOURCE_CONNECT entry** — list all domains the adapter contacts
-4. **Add @connect header** — one `@connect` line per domain
-5. **Wire into ScriptFinder.services** — instantiate in the constructor
-6. **Add InstallSafety allowlist** — if the source serves installable `.user.js` files
-7. **Add a test fixture** — sample response in `tests/fixtures/` with an adapter contract test
-8. **Add accent colors** — source-specific accent in THEME and CSS
-
-The `@connect` allowlist audit (`npm test`) will catch missing @connect entries, orphan domains, and undocumented sources.
+UserScript Finder is available under the [MIT License](LICENSE).

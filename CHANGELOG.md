@@ -2,7 +2,21 @@
 
 All notable changes to UserScript-Finder will be documented in this file.
 
-## [v1.29.0] - 2026-08-12
+## [v1.29.1] (2026-09-06)
+
+### Changed
+
+- Replaced the generic binocular artwork with a transparent magnifier-and-script identity that remains recognizable in userscript manager menus.
+- Rebuilt the README around installation, real product views, source coverage, and the checks that run before an install handoff.
+- Added four deterministic product captures, a social preview, and a repeatable local marketing capture command.
+- Added a locked Playwright development dependency and removed the machine-specific test fallback.
+- Removed the toast backdrop blur and tightened oversized or fully rounded surfaces to match the product's compact panel design.
+
+### Fixed
+
+- Isolated the root-domain fallback test from live Reddit redirects so exact-host coverage remains deterministic.
+
+ ()
 
 ### Added
 - Add deferred, cached source-code previews with bounded syntax highlighting for installable userscripts before installation.
@@ -15,7 +29,7 @@ All notable changes to UserScript-Finder will be documented in this file.
 - Deduplicate GitHub Gist results using case-insensitive owner/hash keys across snippets and search queries.
 - Search `youtube.com` alongside `youtu.be` and `music.youtube.com` in Auto mode so YouTube-compatible scripts are suggested on related sites.
 
-## [v1.28.0] - 2026-07-01
+ ()
 
 ### Fixed
 - Fix _loadAllSources blocking subsequent tab clicks (isLoading stuck true during parallel fetches); added generation counter to discard stale loads
@@ -43,36 +57,36 @@ All notable changes to UserScript-Finder will be documented in this file.
 - Remove 3 dead wrapper methods never called from any code path
 - Clean up .gitignore duplicate blocks and CHANGELOG formatting
 
-## [v1.27.0] - 2026-07-01
+ ()
 
 - Added UI string catalog centralizing modal titles, toasts, empty states, disclosure text, and button labels for localization readiness.
 - Added live fixture refresh script that fetches redacted samples from GreasyFork, Mozilla AMO, and GitHub APIs into tests/fixtures/live/.
 - Added source-adapter documentation in README Contributing section.
 
-## [v1.26.0] - 2026-07-01
+ ()
 
 - Added aggregate all-sources comparison mode with an "All" tab that queries all enabled sources in parallel, deduplicates results by URL, and shows per-item source badges with accent colors.
 - Added search mode selector (Auto/Exact host/Root domain/Keyword) for query control with persistent mode selection.
 
-## [v1.25.0] - 2026-07-01
+ ()
 
 - Added rendered modal smoke tests at desktop (1280x800) and mobile (375x667) widths verifying no overflow, clipping, or missing controls.
 
-## [v1.24.0] - 2026-07-01
+ ()
 
 - Added cross-domain "Queue to try" list with a calendar button on each result that toggles scripts into a persistent queue stored via GM_setValue.
 
-## [v1.23.0] - 2026-07-01
+ ()
 
 - Added per-domain dismissed scripts with a dismiss button on each result, persistent hidden-script storage via GM_setValue, and a "Show all" restore button at the bottom of filtered results.
 
-## [v1.22.0] - 2026-07-01
+ ()
 
 - Added red "Stale" badge for userscript, GitHub, and Gist results not updated in 2+ years.
 - Added settings export/import as JSON for cross-machine settings transfer.
-- Added dangerous @grant warning during install handoff — toasts a warning when scripts request GM_xmlhttpRequest, unsafeWindow, window.close, or window.focus.
+- Added dangerous @grant warning during install handoff: toasts a warning when scripts request GM_xmlhttpRequest, unsafeWindow, window.close, or window.focus.
 
-## [v1.21.0] - 2026-07-01
+ ()
 
 - Added diagnostics manual-copy fallback with a selectable textarea, retry-copy button, and close control when clipboard API is denied.
 - Added cross-tab settings sync via GM_addValueChangeListener with a 3-second polling fallback for managers that lack the API.
@@ -81,93 +95,93 @@ All notable changes to UserScript-Finder will be documented in this file.
 - Added fielded result filtering with `author:`, `license:`, `source:`, `name:`, and `url:` prefix support in the search box.
 - Added release metadata consistency checks (CHANGELOG entry, package.json version) to the @connect allowlist audit.
 
-## [v1.20.0] - 2026-06-30
+ ()
 
 - Added first-run network disclosure that shows source-to-host mapping before any fetch, lets users disable sources before continuing, and re-triggers when new sources are enabled or settings are reset. Added @connect allowlist audit that validates header/adapter/README consistency.
 
-## [v1.19.0] - 2026-06-30
+ ()
 
 - Added runtime manager compatibility checks, degraded-mode reports, Trusted Types duplicate-policy fallback, GM API-safe settings/request/open wrappers, and browser-backed tests for missing GM network/menu capabilities.
 
-## [v1.18.0] - 2026-06-30
+ ()
 
 - Added extension trust badges for Chrome Web Store and Mozilla AMO results, including permission counts, broad host-access warnings, privacy policy signals, data-collection flags, promoted status, and stale-update warnings.
 
-## [v1.17.0] - 2026-06-29
+ ()
 
 - Added root-domain fallback coverage labels for GreasyFork/SleazyFork results by checking raw userscript metadata and marking exact, broad/root, or uncertain host coverage.
 
-## [v1.16.0] - 2026-06-29
+ ()
 
 - Added sensitive-host protection that suppresses source menus, tabs, and network fetches on built-in or user-defined sensitive hosts, plus a per-host override flow and browser-backed coverage.
 
-## [v1.15.0] - 2026-06-28
+ ()
 
 - Added per-source privacy controls that hide disabled sources from menus/tabs, persist source choices, prevent disabled-source network requests, and cover the flow with a browser-backed source privacy test.
 
-## [v1.14.0] - 2026-06-28
+ ()
 
 - Added per-source health badges, footer health age, copyable source diagnostics, and diagnostics markup tests while keeping copied diagnostics limited to source, root host, status, timestamps, cache age, and result count.
 
-## [v1.13.0] - 2026-06-28
+ ()
 
 - Added fixture-backed adapter contract tests for all eight sources plus shared rating, language, and reputation helper checks.
 
-## [v1.12.0] - 2026-06-28
+ ()
 
 - Added modal accessibility semantics, live result/status announcements, accessible control names, focus entry/restoration, contained Tab navigation, and accessibility markup tests.
 
-## [v1.11.0] - 2026-06-28
+ ()
 
 - Added public-suffix-aware host normalization for common multi-label and hosted suffixes, exact-host searching before root fallback, and HostService tests for `co.uk`, `com.au`, `github.io`, mobile prefixes, localhost, and IP hosts.
 
-## [v1.10.0] - 2026-06-28
+ ()
 
 - Added install URL safety checks with per-source HTTPS allowlists, `.user.js` URL validation, metadata-block verification before install handoff, unsafe-result View downgrades, inline warnings, and tests.
 
-## [v1.9.0] - 2026-06-28
+ ()
 
 - Added per-source request timeouts, rate-limit/backoff classification, stale-cache fallback, degraded-result notices, retry controls, manual-search links, and runtime tests.
 - Clamped the modal width to the viewport so resized/mobile views cannot clip the overlay.
 
-## [v1.8.1] - 2026-06-28
+ ()
 
 - Standardized the repository, README, and userscript metadata on the MIT license.
 
-## [v1.8.0] - 2026-06-27
+ ()
 
 - Added inline match coverage previews for installable scripts by fetching raw userscript metadata and comparing `@match`, `@include`, and `@exclude` rules against the current host.
 - Hardened match coverage evaluation to respect scheme, host, path, wildcard, regex-style include, `<all_urls>`, and exclude precedence semantics, with fixture coverage.
 
-## [v1.7.0] - 2026-06-27
+ ()
 
 - Added result filters for updated-within window, normalized minimum rating, and English-looking script names/descriptions, with filter-aware counts and empty states.
 
-## [v1.6.0] - 2026-06-27
+ ()
 
 - Added an Author reputation sort mode that ranks results using available source metrics such as installs, ratings, fan score, stars, forks, extension ratings, and curated catalog source quality.
 
-## [v1.5.0] - 2026-06-27
+ ()
 
 - Added a combined Catalogs source for Awesome Userscripts domain matches and Tampermonkey's Userscript.Zone catalog handoff, with menu/tab wiring, source badges, install/view actions, accent styling, and README coverage.
 
-## [v1.4.0] - 2026-06-27
+ ()
 
 - Added GitHub Gists as a separate userscript source with HTML search parsing, direct raw install handoff for `.user.js` files, tab/menu wiring, source accent, and README coverage.
 
-## [v1.3.0] - 2026-06-27
+ ()
 
 - Added Mozilla AMO as a Firefox extension-alternative source with JSON API search, View actions, tab/menu wiring, source accent, and README coverage.
 
-## [v1.2.0] - 2026-06-27
+ ()
 
 - Added Chrome Web Store as an extension-alternative source with embedded-result parsing, View actions, tab/menu wiring, source accent, and README coverage.
 
-## [v1.1.0] - 2026-06-27
+ ()
 
 - Added OpenUserJS as a fourth source with search, install handoff, menu entry, modal tab, source accent, and README coverage.
 
-## [v1.0.0] - 2026-06-27
+ ()
 
 - README: add related tools section differentiating from UserScriptHunt
 - Removed: Delete UserScript Finder-1.0.0.user.js
@@ -177,7 +191,7 @@ All notable changes to UserScript-Finder will be documented in this file.
 - Added: Add files via upload
 - Added: Add files via upload
 
-## Roadmap archive — 2026-08-10 — ROADMAP.md
+## Roadmap archive: 2026-08-10: ROADMAP.md
 
 <details>
 <summary>Original roadmap snapshot</summary>
@@ -185,7 +199,7 @@ All notable changes to UserScript-Finder will be documented in this file.
 ```markdown
 # Roadmap
 
-Forward-looking plans for UserScript Finder — a userscript that adds Tampermonkey/Violentmonkey menu entries to search userscript registries, extension stores, catalogs, Gists, and GitHub for matches on the current site.
+Forward-looking plans for UserScript Finder: a userscript that adds Tampermonkey/Violentmonkey menu entries to search userscript registries, extension stores, catalogs, Gists, and GitHub for matches on the current site.
 
 ## Planned Features
 
@@ -196,27 +210,27 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
 - Source-code preview with syntax highlighting before install
 
 ### Reliability
-- [ ] P2 — Clear `setInterval` handle from `watchForChanges` polling fallback
+- [ ] P2: Clear `setInterval` handle from `watchForChanges` polling fallback
   Why: The 3000ms interval is never cleared; on SPA re-injection, multiple intervals accumulate holding ScriptFinder closures alive.
   Where: `SettingsService.watchForChanges`, line ~958
-- [ ] P2 — Guard `_loadScripts` finally-block recursive call against concurrent re-entry
+- [ ] P2: Guard `_loadScripts` finally-block recursive call against concurrent re-entry
   Why: Between `isLoading = false` and the recursive `_loadScripts()` call, other callers can slip in and start a parallel load.
   Where: `ScriptFinder._loadScripts`, finally block at end
-- [ ] P3 — Cap per-domain dismissed scripts and queue storage
+- [ ] P3: Cap per-domain dismissed scripts and queue storage
   Why: `sf_dismissed` and `sf_queue` GM values grow without bound; heavy use could eventually hit manager storage limits.
   Where: `_dismissScript`, `_toggleQueued`
-- [ ] P3 — OpenUserJS install URL assumes two-segment script paths
+- [ ] P3: OpenUserJS install URL assumes two-segment script paths
   Why: Paths like `/scripts/123` (without author segment) produce broken install URLs that pass validation but 404 on fetch.
   Where: `OpenUserJSScriptService._normalizeRow`, line ~1268
-- [ ] P3 — Gist deduplication uses case-sensitive hash comparison
+- [ ] P3: Gist deduplication uses case-sensitive hash comparison
   Why: The regex match is case-insensitive but the `seen` Set key preserves original casing; mixed-case hashes from GitHub could duplicate results.
   Where: `GitHubGistService._normalizeSnippet`, line ~1965
 
 ## Competitive Research
 
-- **UserScriptHunt** (sibling project): web app doing the same search in parallel — this userscript is the in-page companion. Keep feature parity on sources.
+- **UserScriptHunt** (sibling project): web app doing the same search in parallel: this userscript is the in-page companion. Keep feature parity on sources.
 - **Greasy Fork's own "for this site" filter**: good baseline but siloed. We aggregate; they don't.
-- **Tampermonkey Dashboard**: the install destination. Don't try to replace — complement by linking cleanly into its editor.
+- **Tampermonkey Dashboard**: the install destination. Don't try to replace: complement by linking cleanly into its editor.
 - **Stylus equivalent for CSS**: similar search-for-this-site pattern exists for userstyles (userstyles.world). Consider a styles tab as a v2 addition.
 
 ## Nice-to-Haves
@@ -225,21 +239,21 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
 - "Copy install URL" + QR code for mobile-to-desktop transfer
 - Per-source API-key support (GitHub token) to raise rate limits
 - Offline cache of the last N searches
-- Script conflict detector — warn if two installed scripts both touch the same element tree
-- AI-assisted summary of a script's source (local model) for "does this script do what it claims?"
+- Script conflict detector: warn if two installed scripts both touch the same element tree
+- On-device source summary that helps readers check whether a script matches its claims
 
 ## Open-Source Research (Round 2)
 
 ### Related OSS Projects
-- https://github.com/ish4ra/greasyforksearch — userscript that aggregates searches across GF/SF/OUJ/MG
-- https://github.com/ChinaGodMan/UserScripts — greasyfork-search via Google advanced operators
-- https://github.com/F9y4ng/GreasyFork-Scripts — SE-assistant + script-shop shell
-- https://github.com/greasyfork-org/greasyfork — upstream Greasy Fork (API surface to mirror)
-- https://github.com/OpenUserJs/OpenUserJS.org — OpenUserJS source
-- https://github.com/Tampermonkey/tampermonkey — GM API surface reference
-- https://github.com/violentmonkey/violentmonkey — fully-OSS alternative manager
-- https://github.com/awesome-scripts/awesome-userscripts — curated list, good for seed data
-- https://github.com/sizzlemctwizzle/OpenUserJS.org — OpenUserJS maintainer-side patterns
+- https://github.com/ish4ra/greasyforksearch: userscript that aggregates searches across GF/SF/OUJ/MG
+- https://github.com/ChinaGodMan/UserScripts: greasyfork-search via Google advanced operators
+- https://github.com/F9y4ng/GreasyFork-Scripts: SE-assistant + script-shop shell
+- https://github.com/greasyfork-org/greasyfork: upstream Greasy Fork (API surface to mirror)
+- https://github.com/OpenUserJs/OpenUserJS.org: OpenUserJS source
+- https://github.com/Tampermonkey/tampermonkey: GM API surface reference
+- https://github.com/violentmonkey/violentmonkey: fully-OSS alternative manager
+- https://github.com/awesome-scripts/awesome-userscripts: curated list, good for seed data
+- https://github.com/sizzlemctwizzle/OpenUserJS.org: OpenUserJS maintainer-side patterns
 
 ### Features to Borrow
 - Multi-site toggle in-UI (GF/SF/OUJ/MonkeyGuts/Google CSE) following greasyforksearch UX
@@ -251,12 +265,12 @@ Forward-looking plans for UserScript Finder — a userscript that adds Tampermon
 - Script-version watcher using `@updateURL` polling with HEAD-only checks (Tampermonkey GM API pattern)
 - Import from Violentmonkey/Tampermonkey export JSON for "has-installed" filtering (GM_listValues extension bridge)
 - Per-category landing pages seeded from awesome-userscripts taxonomy
-- AI-assisted summary of a script (local ONNX model) — already in roadmap; use CodeT5-small or similar ≤50MB
+- On-device source summary using a compact local model such as CodeT5-small
 
 ### Patterns & Architectures Worth Studying
 - Source-federation layer: each registry (GF/SF/OUJ/GitHub) is an adapter with `search()`, `getScript()`, `stats()`
 - Install-handoff protocol: redirect to `*.user.js` raw URL, let Tampermonkey/Violentmonkey capture the install (avoid re-implementing the parser)
-- CORS-proxy fallback for sites without permissive headers — Cloudflare Worker or local proxy when running as userscript
+- CORS-proxy fallback for sites without permissive headers: Cloudflare Worker or local proxy when running as userscript
 - Rate-limit respect: per-source backoff + cached results in `GM_setValue` with TTL
 - Conflict detector: parse `@match` / `@include` from installed scripts and flag overlapping DOM targets
 ```

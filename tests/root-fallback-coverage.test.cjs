@@ -12,7 +12,7 @@ let browser;
 (async () => {
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
-  await page.route("https://old.reddit.com/*", route => route.fulfill({
+  await page.route(/^https:\/\/old\.reddit\.com\/.*/, route => route.fulfill({
     status: 200,
     contentType: "text/html",
     body: "<!doctype html><title>root fallback</title>"
