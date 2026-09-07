@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UserScript Finder
 // @namespace    http://tampermonkey.net/
-// @version      1.29.1
+// @version      1.29.2
 // @description  Search eight userscript and extension sources for the site you're viewing
 // @author       SysAdminDoc
 // @match        *://*/*

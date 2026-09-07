@@ -5,6 +5,7 @@
 - The shipped product has a strong differentiator: domain-aware discovery opens inside the page and shows safety evidence before handing an install to the userscript manager.
 - The old README buried that story under a long feature inventory and an ASCII mockup. Current production-renderer screenshots now show results, source preview, first-run disclosure, and source controls directly.
 - The green binocular icon was generic and the unused root graphic depended on embedded text. The replacement combines a magnifier, script page, and source path in one true-transparent mark that remains identifiable in a 16 px menu slot.
+- Both original magnifier studies are now archived. The compact direction remains the approved mark because it reads more clearly at manager-menu and repository-icon sizes.
 - The product panel already had a coherent dark visual language. Changes stay limited to removing costly backdrop blur and tightening oversized or fully rounded surfaces.
 - Release positioning should lead with “find the right script without leaving the site,” followed by the eight-source comparison and the pre-install checks.
 

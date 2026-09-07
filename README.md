@@ -7,7 +7,7 @@
 <p align="center"><strong>Find the right browser script without leaving the site.</strong></p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v1.29.1-20C9F5?style=for-the-badge" alt="Version 1.29.1">
+  <img src="https://img.shields.io/badge/version-v1.29.2-20C9F5?style=for-the-badge" alt="Version 1.29.2">
   <img src="https://img.shields.io/badge/license-MIT-52E39A?style=for-the-badge" alt="MIT license">
   <img src="https://img.shields.io/badge/userscript-Tampermonkey_%7C_Violentmonkey-8B96B8?style=for-the-badge" alt="Tampermonkey and Violentmonkey">
 </p>
@@ -135,6 +135,10 @@ npm run capture:marketing
 `npm test` runs 19 serial tests covering adapters, install safety, matching, host privacy, disclosure, accessibility, source previews, storage limits, and desktop or mobile layout behavior.
 
 To add a source, implement its adapter, register it in `SOURCE_META`, declare its hosts in `SOURCE_CONNECT` and the `@connect` header, then add a fixture-backed contract test. The allowlist audit rejects undocumented or orphaned hosts.
+
+## Brand archive
+
+The [brand concepts](assets/brand/concepts/) preserve both original magnifier-and-script directions. The selection record identifies the compact mark used by the userscript, screenshots, and repository artwork.
 
 ## License
 
